@@ -1,0 +1,13 @@
+# Нормализуем переводы строк к LF (стандарт Go), чтобы gofmt был чист
+# и файлы не «пачкали» совместную работу/CI из-за CRLF на Windows.
+* text=auto eol=lf
+
+# Явно бинарные файлы — не трогать
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.mp4 binary
+*.mov binary
+*.avi binary

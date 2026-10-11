@@ -1,0 +1,110 @@
+# ============================================================
+#  CFU-Board — прод-окружение: приложение + PostgreSQL
+#  Запуск:  docker compose up --build
+# ============================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cfu-app
+    restart: unless-stopped
+    environment:
+      # Переопределяем хост БД на имя сервиса (в контейнере localhost недоступен).
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgres://${DB_USER:-linkass}:${DB_PASSWORD:-2754}@postgres:5432/${DB_NAME:-cfu-board}?sslmode=disable
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      # Публичный адрес для ссылок верификации (за прокси укажите свой домен).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET обязателен}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
+      # Драйвер хранилища медиафайлов. Приложение сохраняет медиа публикаций
+      # в объектное S3-хранилище MinIO (локальный диск-драйвер удалён).
+      # Значение задаётся явно и НЕ берётся из host-окружения.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-minio}
+      # Настройки MinIO.
+      # Внутри контейнерной сети S3-API доступен по имени сервиса minio:9000
+      # (localhost здесь указывал бы на сам контейнер приложения — неверно).
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cfu-board}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      # Публичный URL, по которому фронтенд из браузера открывает медиа.
+      # Это ВНЕШНИЙ адрес (порт 9000 проброшен на хост), поэтому оставляем
+      # возможность переопределить из окружения (по умолчанию localhost:9000).
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      # Ждём готовности БД и MinIO (драйвер minio по умолчанию).
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-linkass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-2754}
+      POSTGRES_DB: ${DB_NAME:-cfu-board}
+    # Публикуем 5432 на хост, чтобы подключаться из GUI (DBeaver/pgAdmin/psql):
+    #   хост:порт -> контейнер:5432. Внешний порт переопределяем через
+    #   DB_HOST_PORT, если на машине 5432 уже занят (например, локальным
+    #   PostgreSQL или контейнером postgres-db).
+    ports:
+      - "${DB_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-linkass} -d ${DB_NAME:-cfu-board}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    # Образ MinIO. Официальный docker.io/minio/minio удалён с Docker Hub,
+    # а quay.io/minio/minio в этом окружении отдаёт 401 через прокси Docker
+    # Desktop. Рабочий вариант — образ bitnamilegacy/minio с Docker Hub.
+    # Тег закреплён для воспроизводимости.
+    image: bitnamilegacy/minio:2024.11.7
+    container_name: cfu-minio
+    restart: unless-stopped
+    environment:
+      # Учётные данные корня (админка и S3-API). Меняйте в продакшене!
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      # Авто-создание бакета при старте (формат: имя:политика). Приложение
+      # также создаёт бакет и публичную политику идемпотентно в Ensure().
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-cfu-board}:download
+    ports:
+      - "9000:9000" # S3-API (сюда ходит приложение и фронтенд за медиа)
+      - "9001:9001" # веб-консоль администратора MinIO
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      # Проверяем готовность S3-API по публичному live-эндпоинту.
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  minio-data:

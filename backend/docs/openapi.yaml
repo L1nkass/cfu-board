@@ -1,0 +1,1295 @@
+openapi: 3.0.3
+
+info:
+  title: CFU-Board API
+  version: 1.0.0
+  description: |
+    REST API социальной сети **CFU-Board**.
+
+    ## Аутентификация
+    Используется схема **Bearer JWT**. Короткоживущий `access_token` (60 мин)
+    передаётся в заголовке `Authorization: Bearer <access_token>`. Когда он
+    истекает — получите новую пару через `POST /refresh` по `refresh_token`
+    (30 дней, одноразовый, ротация).
+
+    ## Подтверждение email
+    После регистрации на почту уходит ссылка `/verify?token=<raw>`.
+    Повторно запросить письмо: `POST /resend-verification`.
+
+    ## Формат ошибок
+    Все ошибки возвращаются как `{ "error": "описание" }`.
+    Коды: 400 (валидация), 401 (авторизация), 404 (не найдено),
+    409 (конфликт), 413 (файл слишком велик), 429 (rate limit), 500 (сервер).
+
+    ## Ограничение частоты
+    Auth-эндпоинты ограничены (token bucket). При превышении — `429`.
+  contact:
+    name: CFU-Board Backend
+
+servers:
+  - url: http://localhost:8080
+    description: Локальная разработка
+  - url: https://api.cfu.example.com
+    description: Продакшен (пример)
+
+tags:
+  - name: auth
+    description: Регистрация, вход, токены и подтверждение email
+  - name: users
+    description: Профили пользователей
+  - name: posts
+    description: Публикации и медиафайлы
+  - name: health
+    description: Проверки состояния сервиса
+
+paths:
+  /users/me:
+    get:
+      tags: [users]
+      summary: Профиль текущего пользователя
+      description: |
+        Возвращает профиль авторизованного пользователя (по access-токену),
+        включая собственный `email`. Требует заголовок `Authorization: Bearer <token>`.
+        Хеш пароля не возвращается никогда.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnProfile'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: Публичный профиль пользователя по ID
+      description: |
+        Возвращает публичный профиль пользователя по его идентификатору.
+        Приватные поля (`email`, хеш пароля) не включены в ответ.
+        Доступен без авторизации.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор пользователя
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Публичный профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProfile'
+        '400':
+          description: Некорректный идентификатор пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /register:
+    post:
+      tags: [auth]
+      summary: Регистрация нового пользователя
+      description: |
+        Создаёт аккаунт, хеширует пароль (bcrypt) и отправляет письмо
+        для подтверждения email. На этот адрес уйдёт ссылка `/verify?token=...`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+            example:
+              username: ivan_petrov
+              email: ivan@example.com
+              password: Sup3rSecret!
+      responses:
+        '201':
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Ошибка валидации (логин/email/пароль)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Имя пользователя или email уже заняты
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /login:
+    post:
+      tags: [auth]
+      summary: Вход в систему
+      description: |
+        Проверяет логин (или email) и пароль. Возвращает пару токенов:
+        `access_token` (60 мин) и `refresh_token` (30 дней).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+            example:
+              login: ivan_petrov
+              password: Sup3rSecret!
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Неверный логин или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /refresh:
+    post:
+      tags: [auth]
+      summary: Обновление пары токенов
+      description: |
+        По действующему `refresh_token` выдаёт новую пару токенов.
+        **Ротация:** старый `refresh_token` сразу становится недействительным,
+        поэтому обязательно сохраните новый. Повторное использование старого
+        токена отзовёт все активные сессии пользователя.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshInput'
+            example:
+              refresh_token: eyJhbGciOi...
+      responses:
+        '200':
+          description: Новая пара токенов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Refresh-токен недействителен или истёк
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /logout:
+    post:
+      tags: [auth]
+      summary: Выход из системы
+      description: Отзывает предъявленный `refresh_token`. Идемпотентен.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshInput'
+            example:
+              refresh_token: eyJhbGciOi...
+      responses:
+        '200':
+          description: Выход выполнен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /verify:
+    get:
+      tags: [auth]
+      summary: Подтверждение email
+      description: |
+        Активирует аккаунт по токену из письма. Токен одноразовый и
+        действует ограниченное время (по умолчанию 15 минут).
+      parameters:
+        - in: query
+          name: token
+          required: true
+          description: Токен подтверждения из ссылки в письме
+          schema:
+            type: string
+          example: aBcD1234rawTokenFromEmail
+      responses:
+        '200':
+          description: Аккаунт подтверждён (или уже был подтверждён ранее)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Ссылка недействительна, уже использована или истекла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /resend-verification:
+    post:
+      tags: [auth]
+      summary: Повторная отправка письма подтверждения
+      description: |
+        Отправляет письмо подтверждения повторно. Защищено cooldown'ом
+        (интервал между отправками) и лимитом писем в час.
+        Ради безопасности отвечает нейтрально — не раскрывает, существует
+        ли адрес и верифицирован ли он.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationInput'
+            example:
+              email: ivan@example.com
+      responses:
+        '200':
+          description: |
+            Нейтральный ответ. Если аккаунт существует и не подтверждён —
+            письмо будет отправлено (с учётом cooldown/лимита).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Некорректный запрос (пустой email)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /posts:
+    get:
+      tags: [posts]
+      summary: Лента публикаций
+      description: |
+        Публичная лента: новые публикации сверху (`created_at DESC, id DESC`).
+        Пагинация через `limit` (по умолчанию 20, максимум 100) и `offset`.
+        Каждый пост включает данные автора, `likes_count`, `comments_count` и
+        `liked_by_me` (для анонимов всегда `false`; при валидном Bearer-токене
+        персонализируется).
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Сколько постов вернуть (по умолчанию 20, максимум 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Сколько новых постов пропустить
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Страница ленты (пустая лента — пустой массив)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '400':
+          description: Некорректные limit/offset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Предоставлен недействительный токен (при опциональной авторизации)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/create:
+    post:
+      tags: [posts]
+      summary: Создание публикации с медиа
+      description: |
+        Создаёт пост с опциональным изображением и/или видео.
+        Требуется авторизация (Bearer access-токен) и **подтверждённый email**
+        (верифицированный аккаунт). Неверифицированные пользователи получат `403`.
+
+        **Тип запроса:** `multipart/form-data`.
+
+        **Ограничения:** общий размер до 500 МБ. Допустимые форматы —
+        изображения: JPG/PNG/WEBP; видео: MP4/MOV/AVI (проверяется реальное
+        содержимое файла, а не только расширение).
+
+        **Хранилище:** медиа сохраняется в объектное хранилище (MinIO).
+        Сохранённые ссылки на файлы (`image_url`/`video_url`) — абсолютные URL,
+        готовые к использованию в `<img src>` / `<video src>` на клиенте.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                  example: Продам велосипед
+                content:
+                  type: string
+                  example: Состояние отличное, пробег малый.
+                image:
+                  type: string
+                  format: binary
+                  description: Изображение (JPG/PNG/WEBP), необязательно
+                video:
+                  type: string
+                  format: binary
+                  description: Видео (MP4/MOV/AVI), необязательно
+      responses:
+        '201':
+          description: Публикация успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Ошибка валидации полей или файлов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется авторизация / недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Email не подтверждён — публиковать могут только верифицированные пользователи
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Превышен лимит размера запроса (500 МБ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/{id}:
+    get:
+      tags: [posts]
+      summary: Просмотр публикации со счётчиком лайков
+      description: |
+        Публичный эндпоинт: пост виден всем без авторизации. Если запрос отправлен
+        с валидным Bearer-токеном (опционально), поле `liked_by_me` персонализируется
+        под текущего пользователя; для анонимов всегда `false`.
+
+        Поле `likes_count` — количество лайков поста. Постановка/снятие лайка —
+        см. `/posts/{id}/likes`.
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            example: 42
+      responses:
+        '200':
+          description: Публикация найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Некорректный идентификатор публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Предоставлен недействительный токен (при опциональной авторизации)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [posts]
+      summary: Удаление публикации
+      description: |
+        Удаляет публикацию по её идентификатору. Удалить пост может **только его
+        автор** — иначе возвращается `403`. Если поста нет — `404`.
+        Связанные медиафайлы (изображение/видео) удаляются с сервера.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            example: 42
+      responses:
+        '200':
+          description: Публикация успешно удалена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Некорректный идентификатор публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется авторизация / недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Пост принадлежит другому пользователю
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/{id}/likes:
+    post:
+      tags: [posts]
+      summary: Поставить лайк публикации
+      description: |
+        Ставит лайк от имени текущего пользователя. Операция **идемпотентна**:
+        повторный лайк не создаёт дубликат (уникальность гарантируется первичным
+        ключом `post_likes(post_id, user_id)`) и не является ошибкой.
+
+        Ответ содержит актуальное количество лайков поста.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            minimum: 1
+            example: 42
+      responses:
+        '200':
+          description: Лайк обработан (поставлен или уже был)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+        '400':
+          description: Некорректный идентификатор публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется авторизация / недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [posts]
+      summary: Снять лайк с публикации
+      description: |
+        Снимает лайк текущего пользователя. Операция **идемпотентна**: лайка
+        и не было — возвращается текущий счётчик без ошибки.
+
+        Ответ содержит актуальное количество лайков поста.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            minimum: 1
+            example: 42
+      responses:
+        '200':
+          description: Лайк снят (или его и не было)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+        '400':
+          description: Некорректный идентификатор публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Требуется авторизация / недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/{id}/comments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Идентификатор публикации
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+    get:
+      tags: [posts]
+      summary: Дерево комментариев поста
+      description: "Публичный эндпоинт: комментарии видны всем. Возвращаются только корневые комментарии в хронологическом порядке (старые сверху), у каждого — встроенный массив ответов replies (дерево глубины 2). Пагинация limit/offset применяется к корневым комментариям."
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Сколько комментариев вернуть (по умолчанию 20, максимум 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Смещение для пагинации (по умолчанию 0)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Список комментариев (может быть пустым)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommentWithAuthor'
+        '400':
+          description: Некорректный id поста или параметры limit/offset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [posts]
+      summary: Создать комментарий или ответ под постом
+      description: "Требует заголовок `Authorization: Bearer <token>`. Автор берётся из токена. Длина комментария — от 1 до 2000 символов. С опциональным полем parent_id создаётся ответ на корневой комментарий того же поста (ответ на ответ не поддерживается)."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+            example:
+              content: Отличный пост, спасибо!
+      responses:
+        '201':
+          description: Комментарий создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentWithAuthor'
+        '400':
+          description: Пустой или слишком длинный комментарий, некорректный JSON либо некорректный parent_id (не найден, чужой пост или не является корневым комментарием)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Публикация не найдена либо комментарий-родитель исчез между проверкой и вставкой
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/{id}/comments/{commentID}:
+    delete:
+      tags: [posts]
+      summary: Удалить комментарий
+      description: |
+        Удалить комментарий может его автор либо автор поста, под которым
+        тот оставлен. Требует заголовок `Authorization: Bearer <token>`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            minimum: 1
+        - name: commentID
+          in: path
+          required: true
+          description: Идентификатор комментария
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Комментарий удалён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Некорректный идентификатор в пути
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Пользователь не является автором комментария или поста
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Комментарий или публикация не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /posts/{id}/comments/{commentID}/likes:
+    post:
+      tags: [posts]
+      summary: Поставить лайк комментарию
+      description: |
+        Поставить лайк комментарию. Лайк идемпотентен: повторный запрос не
+        создаёт дубликат. Комментарий должен принадлежать указанной публикации.
+        Требует заголовок `Authorization: Bearer <token>`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            minimum: 1
+        - name: commentID
+          in: path
+          required: true
+          description: Идентификатор комментария
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Лайк поставлен (или уже был)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+        '400':
+          description: Некорректный идентификатор в пути
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Комментарий или публикация не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [posts]
+      summary: Снять лайк с комментария
+      description: |
+        Снять лайк с комментария. Снятие идемпотентно: лайка и не было —
+        просто возвращается текущий счётчик. Требует заголовок
+        `Authorization: Bearer <token>`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор публикации
+          schema:
+            type: integer
+            minimum: 1
+        - name: commentID
+          in: path
+          required: true
+          description: Идентификатор комментария
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Лайк снят (или его не было)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+        '400':
+          description: Некорректный идентификатор в пути
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Комментарий или публикация не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness-проверка
+      description: Сообщает, что процесс жив. Не проверяет внешние зависимости.
+      security: []
+      responses:
+        '200':
+          description: Сервис жив
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness-проверка
+      description: Сообщает, готов ли сервис принимать трафик. Проверяет БД.
+      security: []
+      responses:
+        '200':
+          description: Сервис готов (БД доступна)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Сервис не готов (БД недоступна)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unavailable
+                  reason:
+                    type: string
+                    example: database
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Access-токен в заголовке `Authorization: Bearer <token>`"
+
+  responses:
+    TooManyRequests:
+      description: Слишком много запросов (rate limit)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Слишком много запросов, попробуйте позже
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Внутренняя ошибка сервера
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Человекочитаемое описание ошибки
+      required: [error]
+
+    Success:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Сообщение об успехе
+      required: [message]
+
+    Post:
+      type: object
+      description: Публикация со счётчиком лайков
+      properties:
+        id:
+          type: integer
+          example: 42
+        author_id:
+          type: integer
+          example: 7
+        author_name:
+          type: string
+          example: ivan_petrov
+        author_avatar:
+          type: string
+          description: URL аватара автора (может быть пустым)
+        title:
+          type: string
+          maxLength: 255
+          example: Продам велосипед
+        content:
+          type: string
+          example: Состояние отличное, пробег малый.
+        image_url:
+          type: string
+          description: Абсолютный URL изображения (может отсутствовать)
+          example: https://cdn.example.com/img/abc.jpg
+        video_url:
+          type: string
+          description: Абсолютный URL видео (может отсутствовать)
+          example: https://cdn.example.com/vid/abc.mp4
+        likes_count:
+          type: integer
+          description: Количество лайков поста
+          example: 3
+        liked_by_me:
+          type: boolean
+          description: Лайкнул ли пост текущий пользователь (false для анонимов)
+          example: false
+        comments_count:
+          type: integer
+          description: Количество комментариев поста
+          example: 5
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, author_id, author_name, title, content, likes_count, liked_by_me, comments_count, created_at, updated_at]
+
+    LikeResponse:
+      type: object
+      description: Результат постановки/снятия лайка
+      properties:
+        likes_count:
+          type: integer
+          description: Актуальное количество лайков публикации после операции
+          example: 3
+      required: [likes_count]
+
+    PublicProfile:
+      type: object
+      description: Публичный профиль пользователя (без приватных полей)
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: ivan_petrov
+        avatar_url:
+          type: string
+          description: URL аватара (может быть пустым)
+        is_verified:
+          type: boolean
+          description: Подтверждён ли email пользователя
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        posts_count:
+          type: integer
+          description: Количество публикаций пользователя
+          example: 12
+      required: [id, username, is_verified, is_admin, created_at, posts_count]
+
+    OwnProfile:
+      type: object
+      description: Профиль текущего пользователя (включает собственный email)
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: ivan_petrov
+        avatar_url:
+          type: string
+          description: URL аватара (может быть пустым)
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        is_verified:
+          type: boolean
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        posts_count:
+          type: integer
+          example: 12
+      required: [id, username, email, is_verified, is_admin, created_at, updated_at, posts_count]
+
+    CommentInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Текст комментария (без ведущих/замыкающих пробелов)
+          example: Отличный пост, спасибо!
+        parent_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: |
+            Идентификатор корневого комментария, на который создаётся ответ.
+            Если не указан или null — создаётся корневой комментарий.
+            Отвечать можно только на корневые комментарии (дерево глубины 2).
+          example: null
+
+    CommentWithAuthor:
+      type: object
+      description: |
+        Комментарий с публичными данными автора (без приватных полей).
+        В списке корневых комментариев у каждого элемента есть поле replies —
+        массив ответов на него (может быть пустым).
+      properties:
+        id:
+          type: integer
+          example: 7
+        post_id:
+          type: integer
+          example: 1
+        author_id:
+          type: integer
+          example: 2
+        author_name:
+          type: string
+          example: ivan_petrov
+        author_avatar:
+          type: string
+          description: URL аватара автора (может быть пустым)
+        content:
+          type: string
+          example: Отличный пост, спасибо!
+        parent_id:
+          type: integer
+          nullable: true
+          description: ID родительского комментария (null — корневой комментарий)
+        replies:
+          type: array
+          description: Ответы на комментарий (заполняется в списке корневых комментариев)
+          items:
+            $ref: '#/components/schemas/CommentWithAuthor'
+        likes_count:
+          type: integer
+          description: Количество лайков комментария
+          example: 3
+        liked_by_me:
+          type: boolean
+          description: Лайкнул ли комментарий текущий зритель (false для анонимов)
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, post_id, author_id, author_name, content, replies, likes_count, liked_by_me, created_at, updated_at]
+
+    RegisterInput:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9_-]+$'
+          description: Латинские буквы, цифры, '_' и '-'
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+
+    LoginInput:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          description: Имя пользователя или email
+        password:
+          type: string
+
+    RefreshInput:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          description: Действующий refresh-токен
+
+    ResendVerificationInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    UserObject:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: ivan_petrov
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        is_verified:
+          type: boolean
+          description: Подтверждён ли email. Нужен для доступа к созданию постов.
+          example: true
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Авторизация прошла успешно
+        access_token:
+          type: string
+          description: "JWT, 60 минут. Передавать в `Authorization: Bearer`"
+        refresh_token:
+          type: string
+          description: 30 дней. Одноразовый, обновлять через /refresh
+        user:
+          $ref: '#/components/schemas/UserObject'
+
+    RefreshResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+

@@ -1,0 +1,33 @@
+# --- Секреты и локальное окружение (никогда не попадают в образ) ---
+.env
+.env.*
+!.env.example
+
+# --- Git ---
+.git
+.gitignore
+.gitattributes
+
+# --- Go: артефакты сборки и кэш ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+cfu-board
+cfu-board.exe
+
+# --- Загруженные пользователями файлы (монтируются томом в рантайме) ---
+uploads/
+
+# --- Документация/IDE/прочее ---
+*.md
+!README.md
+.idea/
+.vscode/
+docker-compose*.yml
+Dockerfile
+.dockerignore
+Makefile
