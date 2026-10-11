@@ -2,10 +2,11 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"strconv"
 	"time"
 )
 
@@ -203,7 +204,13 @@ func RateLimitMiddleware(rl *RateLimiter, interval time.Duration) func(http.Hand
 	}
 }
 
-// generateRequestID создаёт короткий уникальный идентификатор запроса.
+// generateRequestID создаёт криптографически случайный идентификатор запроса
+// (16 hex-символов). UnixNano давал коллизии при конкурентных запросах.
 func generateRequestID() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand практически не падает; запасной вариант — наносекунды.
+		return hex.EncodeToString([]byte(time.Now().Format(time.RFC3339Nano)))
+	}
+	return hex.EncodeToString(b[:])
 }

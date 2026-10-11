@@ -157,3 +157,60 @@ func GetUserProfileHandler() http.HandlerFunc {
 		json.NewEncoder(w).Encode(profile)
 	}
 }
+
+// ListUserPostsHandler обрабатывает GET /users/{id}/posts — публичную ленту
+// публикаций одного автора (новые сверху, limit/offset как в GET /posts).
+// При валидном токене liked_by_me персонализируется (OptionalAuthMiddleware),
+// анонимы получают false. Несуществующий автор — 404, а не пустой список.
+func ListUserPostsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			RespondWithError(w, http.StatusMethodNotAllowed, "Метод не поддерживается")
+			return
+		}
+
+		authorID, err := strconv.Atoi(strings.TrimSpace(r.PathValue("id")))
+		if err != nil || authorID <= 0 {
+			RespondWithError(w, http.StatusBadRequest, "Некорректный идентификатор пользователя")
+			return
+		}
+
+		limit, err := parseQueryInt(r, "limit", defaultPostsLimit)
+		if err != nil || limit < 1 || limit > maxPostsLimit {
+			RespondWithError(w, http.StatusBadRequest, "Параметр limit: целое число от 1 до 100")
+			return
+		}
+		offset, err := parseQueryInt(r, "offset", 0)
+		if err != nil || offset < 0 {
+			RespondWithError(w, http.StatusBadRequest, "Параметр offset: целое неотрицательное число")
+			return
+		}
+
+		viewerID, _ := r.Context().Value(UserIDKey).(int)
+
+		userRepo := repository.NewUserRepository(database.GlobalPool)
+		ctx, cancel := context.WithTimeout(r.Context(), profileOpTimeout)
+		defer cancel()
+
+		if _, err := userRepo.GetByID(ctx, authorID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				RespondWithError(w, http.StatusNotFound, "Пользователь не найден")
+				return
+			}
+			slog.Error("не удалось проверить автора для ленты", "user_id", authorID, "error", err)
+			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке публикаций")
+			return
+		}
+
+		posts, err := userRepo.ListPostsByAuthorWithLikes(ctx, viewerID, authorID, limit, offset)
+		if err != nil {
+			slog.Error("не удалось загрузить публикации автора", "user_id", authorID, "error", err)
+			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке публикаций")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(posts)
+	}
+}

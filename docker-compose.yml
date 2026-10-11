@@ -1,12 +1,13 @@
 # ============================================================
-#  CFU-Board — прод-окружение: приложение + PostgreSQL
-#  Запуск:  docker compose up --build
+#  CFU-Board — прод-окружение: приложение + PostgreSQL + MinIO
+#  Запуск из корня репозитория:  docker compose up --build
+#  Монорепо: бэкенд живёт в ./backend, compose собирает его оттуда.
 # ============================================================
 
 services:
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: cfu-app
     restart: unless-stopped

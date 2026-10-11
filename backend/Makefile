@@ -41,18 +41,18 @@ tidy:
 ## lint: форматирование + vet + тесты (быстрый контроль качества)
 lint: fmt vet test
 
-## docker-up: собрать образ и поднять прод-окружение
+## docker-up: собрать образ и поднять прод-окружение (из корня монорепо)
 docker-up:
-	@docker compose up --build -d
-	@docker compose ps
+	@docker compose -f ../docker-compose.yml up --build -d
+	@docker compose -f ../docker-compose.yml ps
 
 ## docker-down: остановить и удалить контейнеры
 docker-down:
-	@docker compose down
+	@docker compose -f ../docker-compose.yml down
 
 ## docker-logs: смотреть логи приложения
 docker-logs:
-	@docker compose logs -f app
+	@docker compose -f ../docker-compose.yml logs -f app
 
 ## clean: удалить артефакты сборки
 clean:

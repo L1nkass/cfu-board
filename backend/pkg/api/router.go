@@ -82,6 +82,12 @@ func NewRouter(
 		auth,
 	))
 	mux.Handle("GET /users/{id}", GetUserProfileHandler())
+	// Лента автора — тем же шаблоном {id}, но с суффиксом /posts.
+	// Конфликта с /users/{id} нет: шаблоны различаются длиной пути.
+	mux.Handle("GET /users/{id}/posts", chain(
+		ListUserPostsHandler(),
+		optionalAuth,
+	))
 
 	// --- Posts: лента, создание, просмотр, удаление ---
 	// Лента публичная, с опциональной персонализацией liked_by_me.
@@ -91,10 +97,8 @@ func NewRouter(
 		ListPostsHandler(),
 		optionalAuth,
 	))
-	mux.Handle("POST /posts/create", chain(
-		CreatePostMultipartHandler(store),
-		auth,
-	))
+	// POST /posts/create регистрируется в КОНЦЕ NewRouter на отдельном
+	// корневом mux со своим UploadTimeout (мимо глобального Timeout).
 	// Публичный просмотр с опциональной персонализацией liked_by_me.
 	mux.Handle("GET /posts/{id}", chain(
 		GetPostHandler(),
@@ -152,18 +156,38 @@ func NewRouter(
 	// Порядок (снаружи внутрь):
 	// Recover -> RequestID -> AccessLogger -> SecurityHeaders -> CORS -> Timeout -> mux.
 	// Recover первым, чтобы ловить паники всех нижележащих слоёв.
+	// Исключение: POST /posts/create (загрузка до 500 МБ) идёт МИМО глобального
+	// Timeout со своим щедрым UploadTimeout — иначе медленные видео обрывались
+	// бы по общему RequestTimeout=60s.
 	requestTimeout := 60 * time.Second
+	uploadTimeout := 15 * time.Minute
 	allowedOrigins := []string{"*"}
 	if cfg != nil {
 		if cfg.HTTP.RequestTimeout > 0 {
 			requestTimeout = cfg.HTTP.RequestTimeout
+		}
+		if cfg.HTTP.UploadTimeout > 0 {
+			uploadTimeout = cfg.HTTP.UploadTimeout
 		}
 		if len(cfg.HTTP.AllowedOrigins) > 0 {
 			allowedOrigins = cfg.HTTP.AllowedOrigins
 		}
 	}
 
-	return chain(
+	uploadHandler := chain(
+		CreatePostMultipartHandler(store),
+		auth,
+		Recover,
+		RequestID,
+		AccessLogger,
+		SecurityHeaders,
+		CORS(allowedOrigins),
+		Timeout(uploadTimeout),
+	)
+	//mux.Handle("POST /posts/create", uploadHandler) — регистрируется ниже
+	// на ОТДЕЛЬНОМ mux без глобального Timeout (см. конец функции).
+
+	global := chain(
 		mux,
 		Recover,
 		RequestID,
@@ -172,4 +196,12 @@ func NewRouter(
 		CORS(allowedOrigins),
 		Timeout(requestTimeout),
 	)
+
+	// Корневой mux: аплоад — своим хендлером, всё остальное — глобальной цепочкой.
+	// Точное совпадение "POST /posts/create" проверяется первым, иначе запрос
+	// ушёл бы в global и был бы прибит RequestTimeout.
+	root := http.NewServeMux()
+	root.Handle("POST /posts/create", uploadHandler)
+	root.Handle("/", global)
+	return root
 }

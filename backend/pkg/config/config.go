@@ -42,7 +42,11 @@ type HTTPConfig struct {
 	IdleTimeout       time.Duration
 	ShutdownTimeout   time.Duration
 	RequestTimeout    time.Duration
-	AllowedOrigins    []string
+	// UploadTimeout — отдельный (щедрый) таймаут для POST /posts/create:
+	// загрузка видео до 500 МБ на медленном канале не укладывается в общий
+	// RequestTimeout, поэтому аплоад идёт мимо глобального Timeout.
+	UploadTimeout  time.Duration
+	AllowedOrigins []string
 }
 
 // DBConfig — настройки пула соединений с PostgreSQL.
@@ -101,6 +105,7 @@ func Load() (*Config, error) {
 			IdleTimeout:       getEnvDuration("HTTP_IDLE_TIMEOUT", 120*time.Second),
 			ShutdownTimeout:   getEnvDuration("HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
 			RequestTimeout:    getEnvDuration("HTTP_REQUEST_TIMEOUT", 60*time.Second),
+			UploadTimeout:     getEnvDuration("HTTP_UPLOAD_TIMEOUT", 15*time.Minute),
 			AllowedOrigins:    getEnvSlice("HTTP_ALLOWED_ORIGINS", []string{"*"}),
 		},
 		DB: DBConfig{
@@ -202,6 +207,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Storage.Bucket == "" {
 		return fmt.Errorf("MINIO_BUCKET обязателен для драйвера 'minio'")
+	}
+	if c.HTTP.UploadTimeout <= 0 {
+		return fmt.Errorf("HTTP_UPLOAD_TIMEOUT должен быть положительным")
 	}
 	return nil
 }

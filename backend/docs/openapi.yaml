@@ -108,6 +108,75 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /users/{id}/posts:
+    get:
+      tags: [users]
+      summary: Публикации пользователя
+      description: |
+        Публичная лента публикаций одного автора: новые сверху
+        (`created_at DESC, id DESC`). Пагинация через `limit` (по умолчанию 20,
+        максимум 100) и `offset`. Каждый пост включает `likes_count`,
+        `comments_count` и `liked_by_me` (для анонимов всегда `false`; при
+        валидном Bearer-токене персонализируется). Несуществующий автор — 404.
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Идентификатор пользователя
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+        - name: limit
+          in: query
+          required: false
+          description: Сколько постов вернуть (по умолчанию 20, максимум 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Сколько новых постов пропустить
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Страница публикаций автора (нет постов — пустой массив)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '400':
+          description: Некорректный id, limit или offset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Предоставлен недействительный токен (при опциональной авторизации)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /register:
     post:
       tags: [auth]

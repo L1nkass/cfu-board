@@ -1,0 +1,16 @@
+# --- Секреты и локальное окружение (никогда не попадают в git) ---
+.env
+
+# --- Go: артефакты сборки и кэш ---
+bin/
+*.exe
+*.test
+*.out
+
+# --- Docker volumes рядом с compose (если появятся) ---
+
+# --- Документация/IDE/прочее ---
+.idea/
+.vscode/
+frontend/node_modules/
+frontend/dist/
