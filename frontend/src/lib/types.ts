@@ -14,6 +14,7 @@ export interface Post {
   likes_count: number;
   liked_by_me: boolean;
   comments_count: number;
+  views_count: number;
   created_at: string;
   updated_at: string;
   status: PostStatus;

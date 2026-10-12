@@ -1274,6 +1274,10 @@ components:
           type: integer
           description: Количество комментариев поста
           example: 5
+        views_count:
+          type: integer
+          description: Количество просмотров поста (+1 за каждый GET /posts/{id})
+          example: 42
         created_at:
           type: string
           format: date-time
@@ -1297,7 +1301,7 @@ components:
           type: string
           format: date-time
           description: Время принятия решения модерации (если решено)
-      required: [id, author_id, author_name, title, content, status, likes_count, liked_by_me, comments_count, created_at, updated_at]
+      required: [id, author_id, author_name, title, content, status, likes_count, liked_by_me, comments_count, views_count, created_at, updated_at]
 
     LikeResponse:
       type: object

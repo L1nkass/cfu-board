@@ -52,10 +52,11 @@ func (r *UserRepository) RemoveLike(ctx context.Context, postID, userID int) (in
 }
 
 // GetPostWithLikes загружает публикацию вместе с данными автора, счётчиком
-// лайков, признаком «лайкнул ли этот пост текущий зритель» и счётчиком
-// комментариев. viewerID <= 0 — анонимный просмотр (liked_by_me всегда false:
-// пользователей с id <= 0 в БД нет). Возвращает pgx.ErrNoRows, если пост не
-// найден. Пустые image_url/video_url из БД маппятся в пустые строки.
+// лайков, признаком «лайкнул ли этот пост текущий зритель», счётчиком
+// комментариев и счётчиком просмотров. viewerID <= 0 — анонимный просмотр
+// (liked_by_me всегда false: пользователей с id <= 0 в БД нет). Возвращает
+// pgx.ErrNoRows, если пост не найден. Пустые image_url/video_url из БД маппятся
+// в пустые строки.
 //
 // Модерация: неодобренные посты (pending/rejected) видит ТОЛЬКО их автор —
 // фильтр видимости зашит прямо в SQL (status='approved' OR автор=зритель).
@@ -67,6 +68,7 @@ func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID 
 			(SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id),
 			EXISTS (SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $2),
 			(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),
+			p.views_count,
 			p.created_at, p.updated_at
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
@@ -86,6 +88,7 @@ func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID 
 		&p.Title, &p.Content, &imageURL, &videoURL,
 		&p.Status, &reason, &modBy, &modAt,
 		&p.LikesCount, &p.LikedByMe, &p.CommentsCount,
+		&p.ViewsCount,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -95,4 +98,16 @@ func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID 
 	p.VideoURL = videoURL.String
 	applyModeration(&p, reason, modBy, modAt)
 	return &p, nil
+}
+
+// IncrementPostViews атомарно увеличивает счётчик просмотров публикации на 1
+// и возвращает актуальное значение. Вызывается при каждом GET /posts/{id}
+// (best-effort: ошибка инкремента не должна ронять просмотр поста).
+func (r *UserRepository) IncrementPostViews(ctx context.Context, postID int) (int, error) {
+	var views int
+	err := r.pool.QueryRow(ctx,
+		`UPDATE posts SET views_count = views_count + 1 WHERE id = $1 RETURNING views_count`,
+		postID,
+	).Scan(&views)
+	return views, err
 }

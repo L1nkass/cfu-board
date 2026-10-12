@@ -23,3 +23,13 @@ export function timeAgo(iso: string): string {
   if (diff < 2_592_000) return rtf.format(-Math.floor(diff / 86_400), "day");
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
+
+/** Компактное число для счётчиков: 999 → «999», 1500 → «1,5 тыс.», 2M → «2 млн». */
+export function formatCompact(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "0";
+  if (n < 1000) return String(n);
+  return new Intl.NumberFormat("ru-RU", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(n);
+}

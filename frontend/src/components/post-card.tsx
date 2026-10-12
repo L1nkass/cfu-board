@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CommentsLink } from "@/components/comments-link";
 import { LikeButton } from "@/components/like-button";
 import { PostFrame } from "@/components/post-frame";
 import { StatusBadge } from "@/components/status-badge";
+import { ViewsCount } from "@/components/views-count";
 import { timeAgo } from "@/lib/format";
 import type { Post } from "@/lib/types";
 
@@ -89,15 +90,13 @@ export function PostCard({ post }: { post: Post }) {
               · {timeAgo(post.created_at)}
             </span>
             <div className="flex shrink-0 items-center gap-1">
+              <ViewsCount count={post.views_count} />
               <LikeButton
                 postId={post.id}
                 likesCount={post.likes_count}
                 liked={post.liked_by_me}
               />
-              <span className="flex items-center gap-1 px-1 text-sm text-muted-foreground">
-                <MessageSquare className="h-4 w-4" />
-                {post.comments_count}
-              </span>
+              <CommentsLink postId={post.id} count={post.comments_count} />
             </div>
           </div>
         </div>

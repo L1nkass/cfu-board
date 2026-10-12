@@ -97,6 +97,7 @@ const postsFeedSelect = `
 	       (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id),
 	       EXISTS (SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1),
 	       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),
+	       p.views_count,
 	       p.created_at, p.updated_at
 	FROM posts p
 	JOIN users u ON u.id = p.author_id`
@@ -161,6 +162,7 @@ const postsModerationSelect = `
 	       (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id),
 	       FALSE,
 	       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),
+	       p.views_count,
 	       p.created_at, p.updated_at
 	FROM posts p
 	JOIN users u ON u.id = p.author_id`
@@ -243,6 +245,7 @@ func scanFeedRow(rows pgx.Rows) (models.Post, error) {
 		&p.Title, &p.Content, &imageURL, &videoURL,
 		&p.Status, &reason, &modBy, &modAt,
 		&p.LikesCount, &p.LikedByMe, &p.CommentsCount,
+		&p.ViewsCount,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {

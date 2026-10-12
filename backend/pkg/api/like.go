@@ -141,6 +141,8 @@ func UnlikePostHandler() http.HandlerFunc {
 // GetPostHandler обрабатывает публичный просмотр публикации (GET /posts/{id}).
 // Публичный роут: без токена пост доступен, liked_by_me всегда false; при
 // валидном токене (OptionalAuthMiddleware) поле liked_by_me персонализируется.
+// Каждый успешный просмотр атомарно увеличивает views_count на 1 (best-effort:
+// ошибка инкремента не роняет ответ — пост отдаётся со старым счётчиком).
 func GetPostHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -170,6 +172,14 @@ func GetPostHandler() http.HandlerFunc {
 			slog.Error("не удалось загрузить пост", "post_id", postID, "error", err)
 			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке публикации")
 			return
+		}
+
+		// Инкремент просмотров — после проверки видимости, чтобы скрытые посты
+		// (404 для чужих) счётчик не накручивали.
+		if views, err := userRepo.IncrementPostViews(dbCtx, postID); err != nil {
+			slog.Warn("не удалось увеличить счётчик просмотров", "post_id", postID, "error", err)
+		} else {
+			post.ViewsCount = views
 		}
 
 		w.Header().Set("Content-Type", "application/json")

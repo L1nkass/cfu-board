@@ -38,6 +38,7 @@ type Post struct {
 	LikesCount      int        `json:"likes_count"`                // количество лайков поста
 	LikedByMe       bool       `json:"liked_by_me"`                // лайкнул ли пост текущий зритель (false для анонимов)
 	CommentsCount   int        `json:"comments_count"`             // количество комментариев поста
+	ViewsCount      int        `json:"views_count"`                // количество просмотров поста (+1 за каждый GET /posts/{id})
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
