@@ -117,4 +117,3 @@ func TestGetMyProfileHandler_NoAuthContext(t *testing.T) {
 		t.Fatalf("ожидался код 401 без контекста авторизации, получено %d", rec.Code)
 	}
 }
-

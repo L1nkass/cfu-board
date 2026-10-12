@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // TestDocsHandler проверяет, что /docs отдаёт HTML с Redoc и CSP для CDN.
@@ -56,5 +58,96 @@ func TestOpenAPIYAMLHandler(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "openapi: 3.0.3") {
 		t.Fatal("ответ должен содержать спецификацию OpenAPI")
+	}
+}
+
+// TestOpenAPISpecParses строго парсит docs/openapi.yaml и проверяет,
+// что админ-эндпоинты модерации присутствуют, а все $ref на components/responses
+// разрешаются (нет битых ссылок).
+func TestOpenAPISpecParses(t *testing.T) {
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(old)
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatalf("не удалось перейти в корень проекта: %v", err)
+	}
+
+	data, err := os.ReadFile("docs/openapi.yaml")
+	if err != nil {
+		t.Fatalf("не удалось прочитать спеку: %v", err)
+	}
+
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("openapi.yaml не парсится как YAML: %v", err)
+	}
+
+	paths, _ := doc["paths"].(map[string]any)
+	for _, want := range []string{
+		"/admin/posts/pending",
+		"/admin/posts/{id}/approve",
+		"/admin/posts/{id}/reject",
+	} {
+		if _, ok := paths[want]; !ok {
+			t.Errorf("в спеке нет пути %s", want)
+		}
+	}
+
+	components, _ := doc["components"].(map[string]any)
+	responses, _ := components["responses"].(map[string]any)
+	schemas, _ := components["schemas"].(map[string]any)
+
+	// Собираем все $ref и проверяем, что каждый разрешается.
+	var refs []string
+	var walk func(v any)
+	walk = func(v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			for k, val := range t {
+				if k == "$ref" {
+					if s, ok := val.(string); ok {
+						refs = append(refs, s)
+					}
+				}
+				walk(val)
+			}
+		case []any:
+			for _, val := range t {
+				walk(val)
+			}
+		}
+	}
+	walk(doc)
+
+	if len(refs) == 0 {
+		t.Fatal("в спеке нет ни одного $ref — что-то пошло не так")
+	}
+	for _, ref := range refs {
+		const prefix = "#/components/"
+		if !strings.HasPrefix(ref, prefix) {
+			t.Errorf("неожиданный формат $ref: %q", ref)
+			continue
+		}
+		rest := strings.TrimPrefix(ref, prefix)
+		parts := strings.SplitN(rest, "/", 2)
+		if len(parts) != 2 {
+			t.Errorf("некорректный $ref: %q", ref)
+			continue
+		}
+		group, name := parts[0], parts[1]
+		switch group {
+		case "responses":
+			if _, ok := responses[name]; !ok {
+				t.Errorf("битая ссылка %q: components.responses.%s не существует", ref, name)
+			}
+		case "schemas":
+			if _, ok := schemas[name]; !ok {
+				t.Errorf("битая ссылка %q: components.schemas.%s не существует", ref, name)
+			}
+		default:
+			t.Errorf("неожиданная группа компонентов в $ref: %q", ref)
+		}
 	}
 }

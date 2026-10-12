@@ -1043,6 +1043,151 @@ paths:
                     example: database
 
 
+  /admin/posts/pending:
+    get:
+      tags: [admin]
+      summary: Очередь модерации (только для админов)
+      description: >
+        Возвращает посты со статусом `pending` (ожидают одобрения), старые сверху.
+        Доступно только администраторам (`is_admin = true`); иначе 403.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+          description: Размер страницы
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+          description: Смещение для пагинации
+      responses:
+        '200':
+          description: Список постов на модерации
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Доступ запрещён (не администратор)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /admin/posts/{id}/approve:
+    post:
+      tags: [admin]
+      summary: Одобрить публикацию (только для админов)
+      description: >
+        Переводит пост в статус `approved`, после чего он появляется в общей ленте.
+        Фиксирует moderator и время решения. Доступно только администраторам.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+          description: Идентификатор публикации
+      responses:
+        '200':
+          description: Публикация одобрена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: success }
+                  message: { type: string, example: Публикация одобрена и теперь видна в общей ленте }
+                  post_id: { type: integer, example: 42 }
+                  action: { type: string, example: approved }
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Доступ запрещён (не администратор)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /admin/posts/{id}/reject:
+    post:
+      tags: [admin]
+      summary: Отклонить публикацию (только для админов)
+      description: >
+        Переводит пост в статус `rejected` (скрыт из общей ленты, но автор видит
+        причину). Причина опциональна. Доступно только администраторам.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+          description: Идентификатор публикации
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 1000
+                  description: Причина отказа
+                  example: Нарушение правил сообщества
+      responses:
+        '200':
+          description: Публикация отклонена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: success }
+                  message: { type: string, example: Публикация отклонена }
+                  post_id: { type: integer, example: 42 }
+                  action: { type: string, example: rejected }
+        '400':
+          description: Причина отказа слишком длинная
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Отсутствует или недействителен токен
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Доступ запрещён (не администратор)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1135,7 +1280,24 @@ components:
         updated_at:
           type: string
           format: date-time
-      required: [id, author_id, author_name, title, content, likes_count, liked_by_me, comments_count, created_at, updated_at]
+        status:
+          type: string
+          description: Статус модерации поста
+          enum: [pending, approved, rejected]
+          example: approved
+        rejection_reason:
+          type: string
+          description: Причина отказа (только для статуса rejected)
+          example: Нарушение правил сообщества
+        moderated_by:
+          type: integer
+          description: ID администратора, принявшего решение (если решено)
+          example: 1
+        moderated_at:
+          type: string
+          format: date-time
+          description: Время принятия решения модерации (если решено)
+      required: [id, author_id, author_name, title, content, status, likes_count, liked_by_me, comments_count, created_at, updated_at]
 
     LikeResponse:
       type: object

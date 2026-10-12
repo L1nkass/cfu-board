@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"cfu-board/pkg/config"
+	"cfu-board/pkg/models"
 	"cfu-board/pkg/service"
 	"cfu-board/pkg/storage"
 )
@@ -106,6 +107,22 @@ func NewRouter(
 	))
 	mux.Handle("DELETE /posts/{id}", chain(
 		DeletePostHandler(store),
+		auth,
+	))
+
+	// --- Admin: модерация публикаций (только для админов) ---
+	// Права админа проверяются внутри хендлеров по актуальному статусу из БД,
+	// поэтому здесь достаточно обычного auth-middlware.
+	mux.Handle("GET /admin/posts/pending", chain(
+		AdminListPendingHandler(),
+		auth,
+	))
+	mux.Handle("POST /admin/posts/{id}/approve", chain(
+		AdminModeratePostHandler(models.PostStatusApproved),
+		auth,
+	))
+	mux.Handle("POST /admin/posts/{id}/reject", chain(
+		AdminModeratePostHandler(models.PostStatusRejected),
 		auth,
 	))
 

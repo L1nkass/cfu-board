@@ -173,9 +173,12 @@ func CreatePostMultipartHandler(store storage.Storage) http.HandlerFunc {
 		}
 
 		// 7. Записываем ссылки в PostgreSQL через репозиторий.
+		// Новый пост создаётся со статусом pending (на модерации) и пока не
+		// виден в общей ленте, пока админ не одобрит его.
 		dbCtx, cancel := context.WithTimeout(r.Context(), dbOpTimeout)
 		defer cancel()
-		if err := userRepo.CreatePostWithMedia(dbCtx, authorID, title, content, imageURL, videoURL); err != nil {
+		postID, err := userRepo.CreatePostWithMedia(dbCtx, authorID, title, content, imageURL, videoURL)
+		if err != nil {
 			slog.Error("ошибка сохранения медиа-поста в БД", "error", err)
 			cleanup() // чистим осиротевшие объекты, раз запись в БД не удалась
 			RespondWithError(w, http.StatusInternalServerError, "Ошибка сохранения в базу данных")
@@ -184,7 +187,11 @@ func CreatePostMultipartHandler(store storage.Storage) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		fmt.Fprint(w, `{"status":"success","message":"Публикация с медиа успешно размещена!"}`)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "success",
+			"message": "Публикация отправлена на модерацию. Она появится в общей ленте после одобрения администратором.",
+			"post_id": postID,
+		})
 	}
 }
 

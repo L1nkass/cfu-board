@@ -56,28 +56,35 @@ func (r *UserRepository) RemoveLike(ctx context.Context, postID, userID int) (in
 // комментариев. viewerID <= 0 — анонимный просмотр (liked_by_me всегда false:
 // пользователей с id <= 0 в БД нет). Возвращает pgx.ErrNoRows, если пост не
 // найден. Пустые image_url/video_url из БД маппятся в пустые строки.
+//
+// Модерация: неодобренные посты (pending/rejected) видит ТОЛЬКО их автор —
+// фильтр видимости зашит прямо в SQL (status='approved' OR автор=зритель).
 func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID int) (*models.Post, error) {
 	query := `
 		SELECT p.id, p.author_id, u.username, COALESCE(u.avatar_url, ''),
 		       p.title, p.content, p.image_url, p.video_url,
+		       p.status, p.rejection_reason, p.moderated_by, p.moderated_at,
 			(SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id),
 			EXISTS (SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $2),
 			(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id),
 			p.created_at, p.updated_at
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
-		WHERE p.id = $1
+		WHERE p.id = $1 AND (p.status = 'approved' OR p.author_id = $2)
 		LIMIT 1`
 
 	var (
 		p        models.Post
 		imageURL sql.NullString
 		videoURL sql.NullString
+		reason   sql.NullString
+		modBy    sql.NullInt64
+		modAt    sql.NullTime
 	)
 	err := r.pool.QueryRow(ctx, query, postID, viewerID).Scan(
 		&p.ID, &p.AuthorID, &p.AuthorName, &p.AuthorAvatar,
-		&p.Title, &p.Content,
-		&imageURL, &videoURL,
+		&p.Title, &p.Content, &imageURL, &videoURL,
+		&p.Status, &reason, &modBy, &modAt,
 		&p.LikesCount, &p.LikedByMe, &p.CommentsCount,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
@@ -86,5 +93,6 @@ func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID 
 	}
 	p.ImageURL = imageURL.String
 	p.VideoURL = videoURL.String
+	applyModeration(&p, reason, modBy, modAt)
 	return &p, nil
 }
