@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_Домик" data-name="Домик" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1920">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+        stroke-width: 0px;
+      }
+    </style>
+  </defs>
+  <rect class="cls-1" x="815.16" y="1139.18" width="299.07" height="476.82" rx="20.11" ry="20.11"/>
+  <rect class="cls-1" x="422.98" y="1006.57" width="296.25" height="609.43" rx="20.17" ry="20.17"/>
+  <rect class="cls-1" x="1204.51" y="1006.57" width="296.25" height="609.43" rx="20.17" ry="20.17"/>
+  <path class="cls-1" d="m931.84,221.57L70.68,971.64c-36.31,31.63-13.94,91.36,34.21,91.36h1722.31c48.15,0,70.52-59.73,34.21-91.36L1000.25,221.57c-19.61-17.08-48.81-17.08-68.42,0Z"/>
+</svg>
