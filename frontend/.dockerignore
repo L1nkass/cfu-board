@@ -1,0 +1,6 @@
+node_modules
+.next
+build.log
+npm_install.log
+.srvpid
+.git

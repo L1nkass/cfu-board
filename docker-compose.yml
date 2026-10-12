@@ -1,7 +1,7 @@
-# ============================================================
-#  CFU-Board — прод-окружение: приложение + PostgreSQL + MinIO
-#  Запуск из корня репозитория:  docker compose up --build
-#  Монорепо: бэкенд живёт в ./backend, compose собирает его оттуда.
+﻿# ============================================================
+#  CFU-Board вЂ” РїСЂРѕРґ-РѕРєСЂСѓР¶РµРЅРёРµ: РїСЂРёР»РѕР¶РµРЅРёРµ + PostgreSQL + MinIO
+#  Р—Р°РїСѓСЃРє РёР· РєРѕСЂРЅСЏ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ:  docker compose up --build
+#  РњРѕРЅРѕСЂРµРїРѕ: Р±СЌРєРµРЅРґ Р¶РёРІС‘С‚ РІ ./backend, frontend вЂ” РІ ./frontend.
 # ============================================================
 
 services:
@@ -12,40 +12,40 @@ services:
     container_name: cfu-app
     restart: unless-stopped
     environment:
-      # Переопределяем хост БД на имя сервиса (в контейнере localhost недоступен).
+      # РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј С…РѕСЃС‚ Р‘Р” РЅР° РёРјСЏ СЃРµСЂРІРёСЃР° (РІ РєРѕРЅС‚РµР№РЅРµСЂРµ localhost РЅРµРґРѕСЃС‚СѓРїРµРЅ).
       APP_ENV: ${APP_ENV:-production}
       DATABASE_URL: postgres://${DB_USER:-linkass}:${DB_PASSWORD:-2754}@postgres:5432/${DB_NAME:-cfu-board}?sslmode=disable
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: 8080
-      # Публичный адрес для ссылок верификации (за прокси укажите свой домен).
+      # РџСѓР±Р»РёС‡РЅС‹Р№ Р°РґСЂРµСЃ РґР»СЏ СЃСЃС‹Р»РѕРє РІРµСЂРёС„РёРєР°С†РёРё (Р·Р° РїСЂРѕРєСЃРё СѓРєР°Р¶РёС‚Рµ СЃРІРѕР№ РґРѕРјРµРЅ).
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET обязателен}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET РѕР±СЏР·Р°С‚РµР»РµРЅ}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
-      # Драйвер хранилища медиафайлов. Приложение сохраняет медиа публикаций
-      # в объектное S3-хранилище MinIO (локальный диск-драйвер удалён).
-      # Значение задаётся явно и НЕ берётся из host-окружения.
+      # Р”СЂР°Р№РІРµСЂ С…СЂР°РЅРёР»РёС‰Р° РјРµРґРёР°С„Р°Р№Р»РѕРІ. РџСЂРёР»РѕР¶РµРЅРёРµ СЃРѕС…СЂР°РЅСЏРµС‚ РјРµРґРёР° РїСѓР±Р»РёРєР°С†РёР№
+      # РІ РѕР±СЉРµРєС‚РЅРѕРµ S3-С…СЂР°РЅРёР»РёС‰Рµ MinIO (Р»РѕРєР°Р»СЊРЅС‹Р№ РґРёСЃРє-РґСЂР°Р№РІРµСЂ СѓРґР°Р»С‘РЅ).
+      # Р—РЅР°С‡РµРЅРёРµ Р·Р°РґР°С‘С‚СЃСЏ СЏРІРЅРѕ Рё РќР• Р±РµСЂС‘С‚СЃСЏ РёР· host-РѕРєСЂСѓР¶РµРЅРёСЏ.
       STORAGE_DRIVER: ${STORAGE_DRIVER:-minio}
-      # Настройки MinIO.
-      # Внутри контейнерной сети S3-API доступен по имени сервиса minio:9000
-      # (localhost здесь указывал бы на сам контейнер приложения — неверно).
+      # РќР°СЃС‚СЂРѕР№РєРё MinIO.
+      # Р’РЅСѓС‚СЂРё РєРѕРЅС‚РµР№РЅРµСЂРЅРѕР№ СЃРµС‚Рё S3-API РґРѕСЃС‚СѓРїРµРЅ РїРѕ РёРјРµРЅРё СЃРµСЂРІРёСЃР° minio:9000
+      # (localhost Р·РґРµСЃСЊ СѓРєР°Р·С‹РІР°Р» Р±С‹ РЅР° СЃР°Рј РєРѕРЅС‚РµР№РЅРµСЂ РїСЂРёР»РѕР¶РµРЅРёСЏ вЂ” РЅРµРІРµСЂРЅРѕ).
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-cfu-board}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
-      # Публичный URL, по которому фронтенд из браузера открывает медиа.
-      # Это ВНЕШНИЙ адрес (порт 9000 проброшен на хост), поэтому оставляем
-      # возможность переопределить из окружения (по умолчанию localhost:9000).
+      # РџСѓР±Р»РёС‡РЅС‹Р№ URL, РїРѕ РєРѕС‚РѕСЂРѕРјСѓ С„СЂРѕРЅС‚РµРЅРґ РёР· Р±СЂР°СѓР·РµСЂР° РѕС‚РєСЂС‹РІР°РµС‚ РјРµРґРёР°.
+      # Р­С‚Рѕ Р’РќР•РЁРќРР™ Р°РґСЂРµСЃ (РїРѕСЂС‚ 9000 РїСЂРѕР±СЂРѕС€РµРЅ РЅР° С…РѕСЃС‚), РїРѕСЌС‚РѕРјСѓ РѕСЃС‚Р°РІР»СЏРµРј
+      # РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РїРµСЂРµРѕРїСЂРµРґРµР»РёС‚СЊ РёР· РѕРєСЂСѓР¶РµРЅРёСЏ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ localhost:9000).
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
     ports:
       - "8080:8080"
     depends_on:
-      # Ждём готовности БД и MinIO (драйвер minio по умолчанию).
+      # Р–РґС‘Рј РіРѕС‚РѕРІРЅРѕСЃС‚Рё Р‘Р” Рё MinIO (РґСЂР°Р№РІРµСЂ minio РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ).
       postgres:
         condition: service_healthy
       minio:
@@ -57,6 +57,30 @@ services:
       retries: 3
       start_period: 15s
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # РџСЂРѕРєСЃРё /api/* РёР· РєРѕРЅС‚РµР№РЅРµСЂР° С„СЂРѕРЅС‚Р° РЅР° Р±СЌРєРµРЅРґ РІРЅСѓС‚СЂРё compose-СЃРµС‚Рё.
+        # Р—РЅР°С‡РµРЅРёРµ Р·Р°РїРµРєР°РµС‚СЃСЏ РІ rewrites РїСЂРё СЃР±РѕСЂРєРµ.
+        API_PROXY_TARGET: http://app:8080
+    container_name: cfu-frontend
+    restart: unless-stopped
+    environment:
+      API_PROXY_TARGET: http://app:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   postgres:
     image: postgres:16-alpine
     container_name: cfu-postgres
@@ -65,10 +89,10 @@ services:
       POSTGRES_USER: ${DB_USER:-linkass}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-2754}
       POSTGRES_DB: ${DB_NAME:-cfu-board}
-    # Публикуем 5432 на хост, чтобы подключаться из GUI (DBeaver/pgAdmin/psql):
-    #   хост:порт -> контейнер:5432. Внешний порт переопределяем через
-    #   DB_HOST_PORT, если на машине 5432 уже занят (например, локальным
-    #   PostgreSQL или контейнером postgres-db).
+    # РџСѓР±Р»РёРєСѓРµРј 5432 РЅР° С…РѕСЃС‚, С‡С‚РѕР±С‹ РїРѕРґРєР»СЋС‡Р°С‚СЊСЃСЏ РёР· GUI (DBeaver/pgAdmin/psql):
+    #   С…РѕСЃС‚:РїРѕСЂС‚ -> РєРѕРЅС‚РµР№РЅРµСЂ:5432. Р’РЅРµС€РЅРёР№ РїРѕСЂС‚ РїРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј С‡РµСЂРµР·
+    #   DB_HOST_PORT, РµСЃР»Рё РЅР° РјР°С€РёРЅРµ 5432 СѓР¶Рµ Р·Р°РЅСЏС‚ (РЅР°РїСЂРёРјРµСЂ, Р»РѕРєР°Р»СЊРЅС‹Рј
+    #   PostgreSQL РёР»Рё РєРѕРЅС‚РµР№РЅРµСЂРѕРј postgres-db).
     ports:
       - "${DB_HOST_PORT:-5432}:5432"
     volumes:
@@ -80,27 +104,27 @@ services:
       retries: 5
 
   minio:
-    # Образ MinIO. Официальный docker.io/minio/minio удалён с Docker Hub,
-    # а quay.io/minio/minio в этом окружении отдаёт 401 через прокси Docker
-    # Desktop. Рабочий вариант — образ bitnamilegacy/minio с Docker Hub.
-    # Тег закреплён для воспроизводимости.
+    # РћР±СЂР°Р· MinIO. РћС„РёС†РёР°Р»СЊРЅС‹Р№ docker.io/minio/minio СѓРґР°Р»С‘РЅ СЃ Docker Hub,
+    # Р° quay.io/minio/minio РІ СЌС‚РѕРј РѕРєСЂСѓР¶РµРЅРёРё РѕС‚РґР°С‘С‚ 401 С‡РµСЂРµР· РїСЂРѕРєСЃРё Docker
+    # Desktop. Р Р°Р±РѕС‡РёР№ РІР°СЂРёР°РЅС‚ вЂ” РѕР±СЂР°Р· bitnamilegacy/minio СЃ Docker Hub.
+    # РўРµРі Р·Р°РєСЂРµРїР»С‘РЅ РґР»СЏ РІРѕСЃРїСЂРѕРёР·РІРѕРґРёРјРѕСЃС‚Рё.
     image: bitnamilegacy/minio:2024.11.7
     container_name: cfu-minio
     restart: unless-stopped
     environment:
-      # Учётные данные корня (админка и S3-API). Меняйте в продакшене!
+      # РЈС‡С‘С‚РЅС‹Рµ РґР°РЅРЅС‹Рµ РєРѕСЂРЅСЏ (Р°РґРјРёРЅРєР° Рё S3-API). РњРµРЅСЏР№С‚Рµ РІ РїСЂРѕРґР°РєС€РµРЅРµ!
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-      # Авто-создание бакета при старте (формат: имя:политика). Приложение
-      # также создаёт бакет и публичную политику идемпотентно в Ensure().
+      # РђРІС‚Рѕ-СЃРѕР·РґР°РЅРёРµ Р±Р°РєРµС‚Р° РїСЂРё СЃС‚Р°СЂС‚Рµ (С„РѕСЂРјР°С‚: РёРјСЏ:РїРѕР»РёС‚РёРєР°). РџСЂРёР»РѕР¶РµРЅРёРµ
+      # С‚Р°РєР¶Рµ СЃРѕР·РґР°С‘С‚ Р±Р°РєРµС‚ Рё РїСѓР±Р»РёС‡РЅСѓСЋ РїРѕР»РёС‚РёРєСѓ РёРґРµРјРїРѕС‚РµРЅС‚РЅРѕ РІ Ensure().
       MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-cfu-board}:download
     ports:
-      - "9000:9000" # S3-API (сюда ходит приложение и фронтенд за медиа)
-      - "9001:9001" # веб-консоль администратора MinIO
+      - "9000:9000" # S3-API (СЃСЋРґР° С…РѕРґРёС‚ РїСЂРёР»РѕР¶РµРЅРёРµ Рё С„СЂРѕРЅС‚РµРЅРґ Р·Р° РјРµРґРёР°)
+      - "9001:9001" # РІРµР±-РєРѕРЅСЃРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° MinIO
     volumes:
       - minio-data:/data
     healthcheck:
-      # Проверяем готовность S3-API по публичному live-эндпоинту.
+      # РџСЂРѕРІРµСЂСЏРµРј РіРѕС‚РѕРІРЅРѕСЃС‚СЊ S3-API РїРѕ РїСѓР±Р»РёС‡РЅРѕРјСѓ live-СЌРЅРґРїРѕРёРЅС‚Сѓ.
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s

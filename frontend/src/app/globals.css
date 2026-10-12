@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   CFU-Board — палитра из исходного макета (style.css):
+   фон #141722, клетка #1d222d, панели #222633, кромки #272e3e,
+   пунктир #323b4f, акцент луны #ffe066.
+   ============================================================ */
+
+:root {
+  /* Светлая тема */
+  --background: #eef1f8;
+  --foreground: #141722;
+  --card: #ffffff;
+  --card-foreground: #141722;
+  --popover: #ffffff;
+  --popover-foreground: #141722;
+  --primary: #ffd43b;
+  --primary-foreground: #141722;
+  --secondary: #e2e7f3;
+  --secondary-foreground: #141722;
+  --muted: #e4e9f4;
+  --muted-foreground: #5b6478;
+  --accent: #ffe9a3;
+  --accent-foreground: #141722;
+  --destructive: #d93843;
+  --destructive-foreground: #ffffff;
+  --border: #d3dae9;
+  --input: #c3cce0;
+  --ring: #b8a100;
+  --grid-line: #dfe4f1;
+
+  --radius: 12px;
+}
+
+.dark {
+  /* Тёмная тема — оригинал макета */
+  --background: #141722;
+  --foreground: #e7eaf4;
+  --card: #222633;
+  --card-foreground: #e7eaf4;
+  --popover: #222633;
+  --popover-foreground: #e7eaf4;
+  --primary: #ffe066;
+  --primary-foreground: #141722;
+  --secondary: #272e3e;
+  --secondary-foreground: #e7eaf4;
+  --muted: #1d222d;
+  --muted-foreground: #9aa3b8;
+  --accent: #2f374a;
+  --accent-foreground: #ffe066;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --border: #272e3e;
+  --input: #323b4f;
+  --ring: #ffe066;
+  --grid-line: #1d222d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-grid-line: var(--grid-line);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+  --radius-2xl: 20px;
+
+  --shadow-card: 0 22px 27px rgba(0, 0, 0, 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Клетчатый фон из исходного макета, фиксируется при прокрутке. */
+    background-image:
+      linear-gradient(var(--grid-line) 3px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 3px, transparent 1px);
+    background-size: 25px 25px;
+    background-attachment: fixed;
+  }
+}

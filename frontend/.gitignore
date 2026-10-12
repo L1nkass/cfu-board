@@ -1,0 +1,17 @@
+# Секреты и окружение
+.env
+.env.local
+
+# Артефакты Next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Зависимости
+node_modules/
+
+# Логи
+npm-debug.log*
+*.log
