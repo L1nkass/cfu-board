@@ -56,12 +56,19 @@ export function PostCard({ post }: { post: Post }) {
 
       {/* Нижняя зона: аватар, заголовок, счётчики. */}
       <div className="absolute inset-x-0 bottom-0 top-[70%] z-30">
-        <Avatar className="absolute -top-6 left-5 h-16 w-16 border-[3px] border-[#272e3e] bg-card">
-          <AvatarImage src={post.author_avatar || undefined} alt={post.author_name} />
-          <AvatarFallback className="bg-[#272e3e] text-xl text-foreground">
-            {post.author_name.slice(0, 1).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <Link
+          href={`/user/${post.author_id}`}
+          className="absolute -top-6 left-5 block h-16 w-16 rounded-full transition-transform hover:scale-105"
+          aria-label={`Профиль ${post.author_name}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Avatar className="h-16 w-16 border-[3px] border-[#272e3e] bg-card">
+            <AvatarImage src={post.author_avatar || undefined} alt={post.author_name} />
+            <AvatarFallback className="bg-[#272e3e] text-xl text-foreground">
+              {post.author_name.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
         <div className="flex h-full flex-col justify-center gap-1 pr-4 pl-24">
           <Link
@@ -72,7 +79,14 @@ export function PostCard({ post }: { post: Post }) {
           </Link>
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-xs text-muted-foreground">
-              {post.author_name} · {timeAgo(post.created_at)}
+              <Link
+                href={`/user/${post.author_id}`}
+                className="font-medium text-foreground/80 transition-colors hover:text-[#ffe066] hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {post.author_name}
+              </Link>{" "}
+              · {timeAgo(post.created_at)}
             </span>
             <div className="flex shrink-0 items-center gap-1">
               <LikeButton

@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, MessageSquare, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -65,15 +66,26 @@ function CommentItem({
 
   return (
     <div className="flex gap-3">
-      <Avatar className="h-9 w-9 border-2 border-[#272e3e]">
-        <AvatarImage src={comment.author_avatar || undefined} />
-        <AvatarFallback className="bg-[#272e3e] text-sm">
-          {comment.author_name.slice(0, 1).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
+      <Link
+        href={`/user/${comment.author_id}`}
+        aria-label={`Профиль ${comment.author_name}`}
+        className="block h-9 w-9 shrink-0 rounded-full transition-transform hover:scale-105"
+      >
+        <Avatar className="h-9 w-9 border-2 border-[#272e3e]">
+          <AvatarImage src={comment.author_avatar || undefined} />
+          <AvatarFallback className="bg-[#272e3e] text-sm">
+            {comment.author_name.slice(0, 1).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      </Link>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2">
-          <span className="text-sm font-semibold">{comment.author_name}</span>
+          <Link
+            href={`/user/${comment.author_id}`}
+            className="text-sm font-semibold transition-colors hover:text-[#ffe066] hover:underline"
+          >
+            {comment.author_name}
+          </Link>
           <span className="text-xs text-muted-foreground">
             {timeAgo(comment.created_at)}
           </span>

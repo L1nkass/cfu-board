@@ -2,12 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CommentSection } from "@/components/comment-section";
 import { LikeButton } from "@/components/like-button";
 import { PostFrame } from "@/components/post-frame";
 import { StatusBadge } from "@/components/status-badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth";
@@ -112,11 +114,30 @@ export default function PostPage() {
           </p>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <div className="flex flex-col">
-              <span className="font-medium">{post.author_name}</span>
-              <span className="text-xs text-muted-foreground" title={formatDate(post.created_at)}>
-                {timeAgo(post.created_at)}
-              </span>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/user/${post.author_id}`}
+                aria-label={`Профиль ${post.author_name}`}
+                className="block shrink-0 rounded-full transition-transform hover:scale-105"
+              >
+                <Avatar className="h-10 w-10 border-2 border-[#272e3e]">
+                  <AvatarImage src={post.author_avatar || undefined} alt={post.author_name} />
+                  <AvatarFallback className="bg-[#272e3e] text-sm">
+                    {post.author_name.slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="flex flex-col">
+                <Link
+                  href={`/user/${post.author_id}`}
+                  className="font-medium transition-colors hover:text-[#ffe066] hover:underline"
+                >
+                  {post.author_name}
+                </Link>
+                <span className="text-xs text-muted-foreground" title={formatDate(post.created_at)}>
+                  {timeAgo(post.created_at)}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <LikeButton
