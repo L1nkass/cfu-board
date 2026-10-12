@@ -130,12 +130,12 @@ func TestPostRepository_FeedLikesAndViewer(t *testing.T) {
 		t.Fatalf("AuthorName: %q", anon.AuthorName)
 	}
 
-	if _, err := repo.AddLike(context.Background(), postID, viewer.ID); err != nil {
-		t.Fatalf("AddLike: %v", err)
+	if c, added, err := repo.AddLike(context.Background(), postID, viewer.ID); err != nil || c != 1 || !added {
+		t.Fatalf("AddLike: c=%d added=%v err=%v", c, added, err)
 	}
 	// Повторный лайк идемпотентен — счётчик не растёт.
-	if c, err := repo.AddLike(context.Background(), postID, viewer.ID); err != nil || c != 1 {
-		t.Fatalf("повторный AddLike: c=%d err=%v", c, err)
+	if c, added, err := repo.AddLike(context.Background(), postID, viewer.ID); err != nil || c != 1 || added {
+		t.Fatalf("повторный AddLike: c=%d added=%v err=%v", c, added, err)
 	}
 
 	asViewer, err := repo.GetPostWithLikes(context.Background(), postID, viewer.ID)
@@ -162,7 +162,7 @@ func TestAddLike_MissingPostFK(t *testing.T) {
 	repo := NewUserRepository(pool)
 	u := seedUser(t, repo, "liker", "liker@example.com")
 
-	if _, err := repo.AddLike(context.Background(), 999999, u.ID); err == nil {
+	if _, _, err := repo.AddLike(context.Background(), 999999, u.ID); err == nil {
 		t.Fatal("лайк несуществующего поста должен вернуть ошибку FK")
 	}
 }

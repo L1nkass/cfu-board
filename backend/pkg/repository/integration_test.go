@@ -107,7 +107,7 @@ func truncateAll(t *testing.T) {
 	pool := requirePool(t)
 	_, err := pool.Exec(context.Background(),
 		`TRUNCATE TABLE users, posts, comments, post_likes, comment_likes,
-		 refresh_tokens, email_verifications RESTART IDENTITY CASCADE`)
+		 post_views, refresh_tokens, email_verifications RESTART IDENTITY CASCADE`)
 	if err != nil {
 		t.Fatalf("truncateAll: %v", err)
 	}

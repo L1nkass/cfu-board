@@ -36,7 +36,7 @@ func sqlNullString(s string) any {
 // а решение о видимости принимают вызывающие хендлеры.
 func (r *UserRepository) GetPostByID(ctx context.Context, id int) (*models.Post, error) {
 	query := `SELECT id, author_id, title, content, image_url, video_url,
-		status, rejection_reason, moderated_by, moderated_at, created_at, updated_at
+		status, rejection_reason, moderated_by, moderated_at, views_count, created_at, updated_at
 		FROM posts WHERE id = $1 LIMIT 1`
 
 	var (
@@ -50,7 +50,7 @@ func (r *UserRepository) GetPostByID(ctx context.Context, id int) (*models.Post,
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&p.ID, &p.AuthorID, &p.Title, &p.Content,
 		&imageURL, &videoURL,
-		&p.Status, &reason, &modBy, &modAt,
+		&p.Status, &reason, &modBy, &modAt, &p.ViewsCount,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {

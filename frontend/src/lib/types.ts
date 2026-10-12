@@ -27,6 +27,11 @@ export interface LikeResponse {
   likes_count: number;
 }
 
+export interface PostLikeResponse {
+  likes_count: number;
+  views_count: number;
+}
+
 export interface PublicProfile {
   id: number;
   username: string;

@@ -10,14 +10,15 @@ import (
 // AddLike ставит лайк посту от имени пользователя. Идемпотентно: повторный
 // лайк не создаёт дубликат (первичный ключ (post_id, user_id) + ON CONFLICT
 // DO NOTHING) и не является ошибкой. Возвращает актуальное количество лайков
-// поста после операции. Если пост не существует, запрос завершается ошибкой
+// поста после операции и флаг, был ли лайк реально добавлен (false — повтор).
+// Если пост не существует, запрос завершается ошибкой
 // FK-нарушения (pgconn.PgError с кодом 23503) — хендлер трактует её как 404.
 //
 // ВАЖНО: основной SELECT и INSERT-CTE в одном statement видят один и тот же
 // снимок данных, поэтому COUNT(*) напрямую не увидел бы новую строку. Число
 // реально вставленных строк забираем через RETURNING и прибавляем к счётчику
 // «до» — так ответ всегда актуален, и всё остаётся одним атомарным запросом.
-func (r *UserRepository) AddLike(ctx context.Context, postID, userID int) (int, error) {
+func (r *UserRepository) AddLike(ctx context.Context, postID, userID int) (count int, added bool, err error) {
 	query := `
 		WITH ins AS (
 			INSERT INTO post_likes (post_id, user_id)
@@ -26,10 +27,10 @@ func (r *UserRepository) AddLike(ctx context.Context, postID, userID int) (int, 
 			RETURNING post_id
 		)
 		SELECT (SELECT COUNT(*) FROM post_likes WHERE post_id = $1)
-		     + (SELECT COUNT(*) FROM ins)`
-	var count int
-	err := r.pool.QueryRow(ctx, query, postID, userID).Scan(&count)
-	return count, err
+		     + (SELECT COUNT(*) FROM ins),
+		       (SELECT COUNT(*) FROM ins) > 0`
+	err = r.pool.QueryRow(ctx, query, postID, userID).Scan(&count, &added)
+	return count, added, err
 }
 
 // RemoveLike снимает лайк поста с пользователя. Идемпотентно: лайка и не было —
@@ -100,14 +101,29 @@ func (r *UserRepository) GetPostWithLikes(ctx context.Context, postID, viewerID 
 	return &p, nil
 }
 
-// IncrementPostViews атомарно увеличивает счётчик просмотров публикации на 1
-// и возвращает актуальное значение. Вызывается при каждом GET /posts/{id}
-// (best-effort: ошибка инкремента не должна ронять просмотр поста).
-func (r *UserRepository) IncrementPostViews(ctx context.Context, postID int) (int, error) {
+// IncrementPostViews атомарно засчитывает просмотр публикации от указанного IP
+// и возвращает актуальное значение views_count. Дедупликация: один IP — один
+// просмотр навсегда (PRIMARY KEY (post_id, ip) + ON CONFLICT DO NOTHING).
+// Повторный визит с того же IP счётчик не увеличивает (возвращается текущее
+// значение). Пустой IP не засчитывается — возвращается -1 как маркер «пропуск».
+// Вызывается при GET /posts/{id} (best-effort: ошибка не роняет просмотр поста).
+func (r *UserRepository) IncrementPostViews(ctx context.Context, postID int, ip string) (int, error) {
+	if ip == "" {
+		return -1, nil
+	}
 	var views int
-	err := r.pool.QueryRow(ctx,
-		`UPDATE posts SET views_count = views_count + 1 WHERE id = $1 RETURNING views_count`,
-		postID,
+	err := r.pool.QueryRow(ctx, `
+		WITH ins AS (
+			INSERT INTO post_views (post_id, ip)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
+			RETURNING post_id
+		)
+		UPDATE posts
+		SET views_count = views_count + (SELECT COUNT(*) FROM ins)
+		WHERE id = $1
+		RETURNING views_count`,
+		postID, ip,
 	).Scan(&views)
 	return views, err
 }

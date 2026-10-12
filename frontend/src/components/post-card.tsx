@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CommentsLink } from "@/components/comments-link";
 import { LikeButton } from "@/components/like-button";
@@ -13,6 +14,9 @@ import type { Post } from "@/lib/types";
 /** Карточка поста для сетки ленты (оригинальный макет: медио 70% + низ). */
 export function PostCard({ post }: { post: Post }) {
   const showStatus = post.status !== "approved";
+  // Локальный счётчик просмотров — мгновенно обновляется после лайка
+  // (бэк отдаёт свежий views_count в ответе POST /likes).
+  const [views, setViews] = useState(post.views_count);
 
   return (
     <article className="group relative aspect-[4/3] overflow-hidden rounded-[20px] bg-card shadow-[0_22px_27px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:-translate-y-1">
@@ -90,11 +94,12 @@ export function PostCard({ post }: { post: Post }) {
               · {timeAgo(post.created_at)}
             </span>
             <div className="flex shrink-0 items-center gap-1">
-              <ViewsCount count={post.views_count} />
+              <ViewsCount count={views} />
               <LikeButton
                 postId={post.id}
                 likesCount={post.likes_count}
                 liked={post.liked_by_me}
+                onDone={(_likes, _liked, viewsCount) => setViews(viewsCount)}
               />
               <CommentsLink postId={post.id} count={post.comments_count} />
             </div>

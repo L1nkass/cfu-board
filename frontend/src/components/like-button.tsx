@@ -13,8 +13,8 @@ interface LikeButtonProps {
   postId: number;
   likesCount: number;
   liked: boolean;
-  /** Обновление списка лайков после мутации (опционально). */
-  onDone?: (likesCount: number, liked: boolean) => void;
+  /** Обновление счётчиков после мутации (лайки + просмотры). */
+  onDone?: (likesCount: number, liked: boolean, viewsCount: number) => void;
   className?: string;
 }
 
@@ -35,7 +35,7 @@ export function LikeButton({
     mutationFn: (next: boolean) => likePost(postId, next),
     onSuccess: (data, next) => {
       setState({ count: data.likes_count, liked: next });
-      onDone?.(data.likes_count, next);
+      onDone?.(data.likes_count, next, data.views_count);
       void queryClient.invalidateQueries({ queryKey: qk.feed });
       void queryClient.invalidateQueries({ queryKey: qk.post(postId) });
     },

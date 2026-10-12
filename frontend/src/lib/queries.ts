@@ -4,6 +4,7 @@ import type {
   LikeResponse,
   ModerationResponse,
   Post,
+  PostLikeResponse,
   PublicProfile,
   SuccessResponse,
   OwnProfile,
@@ -50,8 +51,8 @@ export function fetchPending(): Promise<Post[]> {
   return api<Post[]>("/admin/posts/pending?limit=100&offset=0");
 }
 
-export function likePost(id: number, on: boolean): Promise<LikeResponse> {
-  return api<LikeResponse>(`/posts/${id}/likes`, {
+export function likePost(id: number, on: boolean): Promise<PostLikeResponse> {
+  return api<PostLikeResponse>(`/posts/${id}/likes`, {
     method: on ? "POST" : "DELETE",
   });
 }

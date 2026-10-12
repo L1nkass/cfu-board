@@ -648,7 +648,11 @@ paths:
         повторный лайк не создаёт дубликат (уникальность гарантируется первичным
         ключом `post_likes(post_id, user_id)`) и не является ошибкой.
 
-        Ответ содержит актуальное количество лайков поста.
+        Первый (новый) лайк засчитывает просмотр поста с IP автора лайка
+        (дедупликация «один IP — один просмотр»); повторный лайк счётчик
+        просмотров не меняет.
+
+        Ответ содержит актуальное количество лайков и просмотров поста.
       security:
         - bearerAuth: []
       parameters:
@@ -666,7 +670,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LikeResponse'
+                $ref: '#/components/schemas/PostLikeResponse'
         '400':
           description: Некорректный идентификатор публикации
           content:
@@ -712,7 +716,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LikeResponse'
+                $ref: '#/components/schemas/PostLikeResponse'
         '400':
           description: Некорректный идентификатор публикации
           content:
@@ -1276,7 +1280,7 @@ components:
           example: 5
         views_count:
           type: integer
-          description: Количество просмотров поста (+1 за каждый GET /posts/{id})
+          description: Количество уникальных просмотров поста (один IP — один просмотр)
           example: 42
         created_at:
           type: string
@@ -1312,6 +1316,20 @@ components:
           description: Актуальное количество лайков публикации после операции
           example: 3
       required: [likes_count]
+
+    PostLikeResponse:
+      type: object
+      description: Результат постановки/снятия лайка поста (с просмотрами)
+      properties:
+        likes_count:
+          type: integer
+          description: Актуальное количество лайков поста после операции
+          example: 3
+        views_count:
+          type: integer
+          description: Актуальное количество уникальных просмотров поста (один IP — один просмотр)
+          example: 42
+      required: [likes_count, views_count]
 
     PublicProfile:
       type: object

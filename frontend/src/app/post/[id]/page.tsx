@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MessageSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CommentSection } from "@/components/comment-section";
 import { LikeButton } from "@/components/like-button";
@@ -30,6 +31,13 @@ export default function PostPage() {
     queryFn: () => fetchPost(id),
     enabled: Number.isFinite(id),
   });
+
+  // Локальный счётчик просмотров — мгновенно обновляется после лайка
+  // (бэк отдаёт свежий views_count в ответе POST /likes).
+  const [views, setViews] = useState<number | null>(null);
+  useEffect(() => {
+    if (post) setViews(post.views_count);
+  }, [post?.id, post?.views_count]);
 
   const remove = useMutation({
     mutationFn: () => deletePost(id),
@@ -142,7 +150,7 @@ export default function PostPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <ViewsCount count={post.views_count} className="text-base" />
+              <ViewsCount count={views ?? post.views_count} className="text-base" />
               <a
                 href="#comments"
                 className="flex items-center gap-1.5 rounded-full px-2 py-1 text-base text-muted-foreground transition-colors hover:text-[#ffe066]"
@@ -156,6 +164,7 @@ export default function PostPage() {
                 likesCount={post.likes_count}
                 liked={post.liked_by_me}
                 className="text-base"
+                onDone={(_likes, _liked, viewsCount) => setViews(viewsCount)}
               />
               {isAuthor && (
                 <Button
