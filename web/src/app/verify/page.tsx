@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -66,16 +67,15 @@ function VerifyInner() {
           {state.kind === "checking" && (
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           )}
-          {state.kind !== "checking" && (
-            <p
-              className={
-                state.kind === "ok"
-                  ? "text-foreground"
-                  : "text-destructive"
-              }
-            >
-              {state.message}
-            </p>
+          {state.kind === "ok" && (
+            <Alert>
+              <AlertDescription>{state.message}</AlertDescription>
+            </Alert>
+          )}
+          {state.kind === "fail" && (
+            <Alert variant="destructive">
+              <AlertDescription>{state.message}</AlertDescription>
+            </Alert>
           )}
           <Button
             asChild

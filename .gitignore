@@ -12,5 +12,6 @@ bin/
 # --- Документация/IDE/прочее ---
 .idea/
 .vscode/
-frontend/node_modules/
-frontend/dist/
+# Зависимости
+web/node_modules/
+web/dist/

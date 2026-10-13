@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { likePost, qk } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface LikeButtonProps {
@@ -62,12 +63,14 @@ export function LikeButton({
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={toggle}
       aria-label={state.liked ? "Убрать лайк" : "Поставить лайк"}
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 rounded-full px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-[#ffe066]",
+        "h-auto gap-1.5 rounded-full px-2 py-1 text-sm text-muted-foreground hover:bg-transparent hover:text-[#ffe066]",
         state.liked && "text-[#ffe066]",
         className,
       )}
@@ -76,6 +79,6 @@ export function LikeButton({
         className={cn("h-4 w-4 transition-transform", state.liked && "fill-current")}
       />
       <span className="tabular-nums">{state.count}</span>
-    </button>
+    </Button>
   );
 }

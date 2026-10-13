@@ -5,7 +5,7 @@
 | Каталог | Что внутри |
 |---|---|
 | `backend/` | Go API (net/http, pgx, MinIO) — см. `backend/docs/README.md` |
-| `frontend/` | Будущий веб-клиент (пока заглушка, генерируйте клиент из OpenAPI) |
+| `web/` | Веб-клиент (Next.js 16, shadcn/ui, React Query) |
 | `docker-compose.yml` | Прод-окружение: app + PostgreSQL + MinIO |
 
 ## Быстрый старт (Docker)

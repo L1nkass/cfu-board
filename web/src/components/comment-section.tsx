@@ -94,10 +94,12 @@ function CommentItem({
           {comment.content}
         </p>
         <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             className={cn(
-              "flex cursor-pointer items-center gap-1 transition-colors hover:text-[#ffe066]",
+              "h-auto gap-1 px-0 text-xs text-muted-foreground hover:bg-transparent hover:text-[#ffe066]",
               liked.on && "text-[#ffe066]",
             )}
             onClick={() => {
@@ -110,25 +112,29 @@ function CommentItem({
           >
             <Heart className={cn("h-3.5 w-3.5", liked.on && "fill-current")} />
             {liked.count}
-          </button>
+          </Button>
           {comment.parent_id === null && user && (
-            <button
+            <Button
               type="button"
-              className="flex cursor-pointer items-center gap-1 transition-colors hover:text-[#ffe066]"
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1 px-0 text-xs text-muted-foreground hover:bg-transparent hover:text-[#ffe066]"
               onClick={() => onReply(comment)}
             >
               <MessageSquare className="h-3.5 w-3.5" /> Ответить
-            </button>
+            </Button>
           )}
           {canDelete && (
-            <button
+            <Button
               type="button"
-              className="flex cursor-pointer items-center gap-1 transition-colors hover:text-destructive"
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1 px-0 text-xs text-muted-foreground hover:bg-transparent hover:text-destructive"
               onClick={() => del.mutate()}
               disabled={del.isPending}
             >
               <Trash2 className="h-3.5 w-3.5" /> Удалить
-            </button>
+            </Button>
           )}
         </div>
 
@@ -203,13 +209,15 @@ export function CommentSection({
               <span>
                 Ответ для <b className="text-foreground">{replyTo.author_name}</b>
               </span>
-              <button
+              <Button
                 type="button"
-                className="cursor-pointer underline hover:text-[#ffe066]"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 text-xs text-muted-foreground underline hover:bg-transparent hover:text-[#ffe066]"
                 onClick={() => setReplyTo(null)}
               >
                 отменить
-              </button>
+              </Button>
             </div>
           )}
           <Textarea

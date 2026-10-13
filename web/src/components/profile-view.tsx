@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PostCard } from "@/components/post-card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -93,19 +94,19 @@ export function ProfileView({
         </div>
 
         {isOwn && !profile.is_verified && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
-            <span className="text-amber-600 dark:text-amber-400">
+          <Alert className="mt-4 flex flex-wrap items-center gap-3 border-amber-500/30 bg-amber-500/10">
+            <AlertDescription className="flex flex-wrap items-center gap-3 text-amber-600 dark:text-amber-400">
               Email не подтверждён — публиковать пока нельзя.
-            </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={resend}
-              className="border border-[#323b4f] bg-[#272e3e]"
-            >
-              Отправить письмо ещё раз
-            </Button>
-          </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={resend}
+                className="border border-[#323b4f] bg-[#272e3e]"
+              >
+                Отправить письмо ещё раз
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
       </section>
 

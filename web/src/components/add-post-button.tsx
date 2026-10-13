@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 /** Пунктирная кнопка «+» из исходного макета (add_button). */
 export function AddPostButton() {
@@ -42,11 +43,13 @@ export function AddPostButton() {
 /** Ссылка «Написать пост» для пустой ленты. */
 export function EmptyFeedLink() {
   return (
-    <Link
-      href="/new"
-      className="inline-flex items-center gap-2 rounded-xl bg-[#ffe066] px-5 py-2.5 font-medium text-[#141722] transition-colors hover:bg-[#ffd43b]"
+    <Button
+      asChild
+      className="gap-2 bg-[#ffe066] px-5 py-2.5 font-medium text-[#141722] hover:bg-[#ffd43b]"
     >
-      <Plus className="h-4 w-4" /> Написать первый пост
-    </Link>
+      <Link href="/new">
+        <Plus className="h-4 w-4" /> Написать первый пост
+      </Link>
+    </Button>
   );
 }

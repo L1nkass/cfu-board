@@ -12,6 +12,7 @@ import { PostFrame } from "@/components/post-frame";
 import { StatusBadge } from "@/components/status-badge";
 import { ViewsCount } from "@/components/views-count";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth";
@@ -106,17 +107,19 @@ export default function PostPage() {
           </div>
 
           {showStatus && post.status === "pending" && (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-400">
-              Публикация на модерации — она появится в ленте после одобрения.
-            </p>
+            <Alert>
+              <AlertDescription>
+                Публикация на модерации — она появится в ленте после одобрения.
+              </AlertDescription>
+            </Alert>
           )}
           {showStatus && post.status === "rejected" && (
-            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-              Публикация отклонена модератором.
-              {post.rejection_reason && (
-                <> Причина: {post.rejection_reason}</>
-              )}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>
+                Публикация отклонена модератором.
+                {post.rejection_reason && <> Причина: {post.rejection_reason}</>}
+              </AlertDescription>
+            </Alert>
           )}
 
           <p className="whitespace-pre-wrap text-foreground/90">
