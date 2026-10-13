@@ -72,16 +72,8 @@ func LikePostHandler() http.HandlerFunc {
 		userRepo, dbCtx, cancel := likeRepoAndCtx(r)
 		defer cancel()
 
-		// Пост должен существовать — так сразу отдаём понятный 404, а не
-		// нарушение FK внутри INSERT.
-		post, err := userRepo.GetPostByID(dbCtx, postID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				RespondWithError(w, http.StatusNotFound, "Публикация не найдена")
-				return
-			}
-			slog.Error("не удалось проверить пост перед лайком", "post_id", postID, "error", err)
-			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при обработке лайка")
+		post, ok := loadVisiblePost(w, userRepo, dbCtx, postID, userID)
+		if !ok {
 			return
 		}
 
@@ -141,14 +133,8 @@ func UnlikePostHandler() http.HandlerFunc {
 		userRepo, dbCtx, cancel := likeRepoAndCtx(r)
 		defer cancel()
 
-		post, err := userRepo.GetPostByID(dbCtx, postID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				RespondWithError(w, http.StatusNotFound, "Публикация не найдена")
-				return
-			}
-			slog.Error("не удалось проверить пост перед снятием лайка", "post_id", postID, "error", err)
-			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при обработке лайка")
+		post, ok := loadVisiblePost(w, userRepo, dbCtx, postID, userID)
+		if !ok {
 			return
 		}
 
@@ -165,23 +151,37 @@ func UnlikePostHandler() http.HandlerFunc {
 	}
 }
 
-// clientIP извлекает реальный IP клиента: сначала X-Forwarded-For
-// (первый адрес — исходный клиент за прокси/CDN), затем X-Real-IP,
-// иначе — хост из RemoteAddr. Возвращает "" если определить не удалось.
+// clientIP извлекает IP клиента. Клиент может подделать X-Forwarded-For,
+// поэтому берём ПОСЛЕДНИЙ адрес в цепочке (его дописывает ближайший прокси,
+// например Next.js rewrite) и проверяем, что это валидный IP. Иначе —
+// X-Real-IP, иначе RemoteAddr. Пустая строка — пропуск учёта просмотра.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if first, _, _ := strings.Cut(xff, ","); strings.TrimSpace(first) != "" {
-			return strings.TrimSpace(first)
+		parts := strings.Split(xff, ",")
+		for i := len(parts) - 1; i >= 0; i-- {
+			if ip := parseClientIP(strings.TrimSpace(parts[i])); ip != "" {
+				return ip
+			}
 		}
 	}
-	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
-		return xri
+	if ip := parseClientIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != "" {
+		return ip
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return strings.TrimSpace(r.RemoteAddr)
+		return parseClientIP(strings.TrimSpace(r.RemoteAddr))
 	}
-	return host
+	return parseClientIP(host)
+}
+
+func parseClientIP(s string) string {
+	if s == "" {
+		return ""
+	}
+	if ip := net.ParseIP(s); ip != nil {
+		return ip.String()
+	}
+	return ""
 }
 
 // GetPostHandler обрабатывает публичный просмотр публикации (GET /posts/{id}).

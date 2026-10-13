@@ -81,7 +81,7 @@ func TestPostRepository_CountAndListByAuthor(t *testing.T) {
 	id3 := seedPost(t, pool, a.ID, "A3")
 	seedPost(t, pool, b.ID, "B1")
 
-	count, err := repo.CountPostsByAuthor(context.Background(), a.ID)
+	count, err := repo.CountPostsByAuthor(context.Background(), a.ID, 0)
 	if err != nil || count != 3 {
 		t.Fatalf("CountPostsByAuthor A: count=%d err=%v", count, err)
 	}

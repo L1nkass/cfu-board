@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -137,6 +138,14 @@ func CreatePostMultipartHandler(store storage.Storage) http.HandlerFunc {
 			RespondWithError(w, http.StatusBadRequest, "Заголовок и текст публикации обязательны")
 			return
 		}
+		if utf8.RuneCountInString(title) > 255 {
+			RespondWithError(w, http.StatusBadRequest, "Заголовок слишком длинный (максимум 255 символов)")
+			return
+		}
+		if utf8.RuneCountInString(content) > 10000 {
+			RespondWithError(w, http.StatusBadRequest, "Текст публикации слишком длинный (максимум 10000 символов)")
+			return
+		}
 
 		// Сохраняем URL загруженных объектов, чтобы удалить их из хранилища,
 		// если запись в БД не удастся (компенсирующее удаление).
@@ -230,10 +239,9 @@ func saveMediaFile(r *http.Request, store storage.Storage, field string, authorI
 	reader := io.MultiReader(bytes.NewReader(head), file)
 	key := fmt.Sprintf("posts/%d_%d%s", authorID, time.Now().UnixNano(), ext)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
-
-	url, err := store.Save(ctx, key, reader, header.Size, contentTypeForExt(ext))
+	// Таймаут — из контекста запроса (для аплоада это UploadTimeout ~15 мин).
+	// Отдельные 30с здесь обрывали загрузку видео ещё до лимита хендлера.
+	url, err := store.Save(r.Context(), key, reader, header.Size, contentTypeForExt(ext))
 	if err != nil {
 		return "", fmt.Errorf("не удалось сохранить файл '%s': %w", field, err)
 	}

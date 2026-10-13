@@ -82,7 +82,10 @@ func NewRouter(
 		GetMyProfileHandler(),
 		auth,
 	))
-	mux.Handle("GET /users/{id}", GetUserProfileHandler())
+	mux.Handle("GET /users/{id}", chain(
+		GetUserProfileHandler(),
+		optionalAuth,
+	))
 	// Лента автора — тем же шаблоном {id}, но с суффиксом /posts.
 	// Конфликта с /users/{id} нет: шаблоны различаются длиной пути.
 	mux.Handle("GET /users/{id}/posts", chain(

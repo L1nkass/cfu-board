@@ -38,7 +38,10 @@ export const postSchema = z.object({
     .string()
     .min(1, "Укажите заголовок")
     .max(255, "Максимум 255 символов"),
-  content: z.string().min(1, "Напишите текст публикации"),
+  content: z
+    .string()
+    .min(1, "Напишите текст публикации")
+    .max(10000, "Максимум 10000 символов"),
 });
 
 export const commentSchema = z.object({

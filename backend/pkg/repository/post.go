@@ -75,12 +75,14 @@ func (r *UserRepository) DeletePostByID(ctx context.Context, id, authorID int) (
 	return res.RowsAffected() > 0, nil
 }
 
-// CountPostsByAuthor возвращает количество публикаций указанного автора.
-// Используется для отображения счётчика постов в профиле пользователя.
-func (r *UserRepository) CountPostsByAuthor(ctx context.Context, authorID int) (int, error) {
-	query := `SELECT COUNT(*) FROM posts WHERE author_id = $1`
+// CountPostsByAuthor возвращает количество публикаций автора с тем же правилом
+// видимости, что и лента: чужие видят только approved, автор — все свои.
+// viewerID <= 0 — аноним (только одобренные).
+func (r *UserRepository) CountPostsByAuthor(ctx context.Context, authorID, viewerID int) (int, error) {
+	query := `SELECT COUNT(*) FROM posts
+		WHERE author_id = $1 AND (status = 'approved' OR author_id = $2)`
 	var count int
-	if err := r.pool.QueryRow(ctx, query, authorID).Scan(&count); err != nil {
+	if err := r.pool.QueryRow(ctx, query, authorID, viewerID).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil

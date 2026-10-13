@@ -114,15 +114,7 @@ func CreateCommentHandler() http.HandlerFunc {
 		dbCtx, cancel := context.WithTimeout(r.Context(), dbOpTimeout)
 		defer cancel()
 
-		// Пост должен существовать — так сразу отдаём понятный 404, а не
-		// нарушение FK внутри INSERT.
-		if _, err := userRepo.GetPostByID(dbCtx, postID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				RespondWithError(w, http.StatusNotFound, "Публикация не найдена")
-				return
-			}
-			slog.Error("не удалось проверить существование поста для комментария", "post_id", postID, "error", err)
-			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при создании комментария")
+		if _, ok := loadVisiblePost(w, userRepo, dbCtx, postID, authorID); !ok {
 			return
 		}
 
@@ -219,13 +211,7 @@ func ListCommentsHandler() http.HandlerFunc {
 		dbCtx, cancel := context.WithTimeout(r.Context(), dbOpTimeout)
 		defer cancel()
 
-		if _, err := userRepo.GetPostByID(dbCtx, postID); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				RespondWithError(w, http.StatusNotFound, "Публикация не найдена")
-				return
-			}
-			slog.Error("не удалось проверить существование поста для комментариев", "post_id", postID, "error", err)
-			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке комментариев")
+		if _, ok := loadVisiblePost(w, userRepo, dbCtx, postID, viewerID); !ok {
 			return
 		}
 
@@ -274,6 +260,10 @@ func LikeCommentHandler() http.HandlerFunc {
 		userRepo := repository.NewUserRepository(database.GlobalPool)
 		dbCtx, cancel := context.WithTimeout(r.Context(), dbOpTimeout)
 		defer cancel()
+
+		if _, ok := loadVisiblePost(w, userRepo, dbCtx, postID, userID); !ok {
+			return
+		}
 
 		comment, err := userRepo.GetCommentByID(dbCtx, commentID)
 		if err != nil {
@@ -340,6 +330,10 @@ func UnlikeCommentHandler() http.HandlerFunc {
 		dbCtx, cancel := context.WithTimeout(r.Context(), dbOpTimeout)
 		defer cancel()
 
+		if _, ok := loadVisiblePost(w, userRepo, dbCtx, postID, userID); !ok {
+			return
+		}
+
 		comment, err := userRepo.GetCommentByID(dbCtx, commentID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -405,14 +399,8 @@ func DeleteCommentHandler() http.HandlerFunc {
 
 		// Грузим пост: чтобы отличить «не существует» (404) от «чужой» (403)
 		// — автор поста тоже имеет право удалять комментарии под ним.
-		post, err := userRepo.GetPostByID(dbCtx, postID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				RespondWithError(w, http.StatusNotFound, "Публикация не найдена")
-				return
-			}
-			slog.Error("не удалось загрузить пост для удаления комментария", "post_id", postID, "error", err)
-			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при удалении комментария")
+		post, ok := loadVisiblePost(w, userRepo, dbCtx, postID, actorID)
+		if !ok {
 			return
 		}
 

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { likePost, qk } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,9 @@ export function LikeButton({
   const queryClient = useQueryClient();
   // Локальное состояние — мгновенный отклик, сервер синхронизируется мутацией.
   const [state, setState] = useState({ count: likesCount, liked });
+  useEffect(() => {
+    setState({ count: likesCount, liked });
+  }, [likesCount, liked]);
 
   const mutation = useMutation({
     mutationFn: (next: boolean) => likePost(postId, next),

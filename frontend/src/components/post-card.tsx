@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CommentsLink } from "@/components/comments-link";
 import { LikeButton } from "@/components/like-button";
@@ -17,6 +17,9 @@ export function PostCard({ post }: { post: Post }) {
   // Локальный счётчик просмотров — мгновенно обновляется после лайка
   // (бэк отдаёт свежий views_count в ответе POST /likes).
   const [views, setViews] = useState(post.views_count);
+  useEffect(() => {
+    setViews(post.views_count);
+  }, [post.views_count]);
 
   return (
     <article className="group relative aspect-[4/3] overflow-hidden rounded-[20px] bg-card shadow-[0_22px_27px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:-translate-y-1">

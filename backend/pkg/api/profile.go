@@ -78,7 +78,7 @@ func GetMyProfileHandler() http.HandlerFunc {
 			return
 		}
 
-		postsCount, err := userRepo.CountPostsByAuthor(ctx, userID)
+		postsCount, err := userRepo.CountPostsByAuthor(ctx, userID, userID)
 		if err != nil {
 			slog.Error("не удалось подсчитать публикации пользователя", "user_id", userID, "error", err)
 			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке профиля")
@@ -135,7 +135,8 @@ func GetUserProfileHandler() http.HandlerFunc {
 			return
 		}
 
-		postsCount, err := userRepo.CountPostsByAuthor(ctx, userID)
+		viewerID, _ := r.Context().Value(UserIDKey).(int)
+		postsCount, err := userRepo.CountPostsByAuthor(ctx, userID, viewerID)
 		if err != nil {
 			slog.Error("не удалось подсчитать публикации пользователя", "user_id", userID, "error", err)
 			RespondWithError(w, http.StatusInternalServerError, "Ошибка сервера при загрузке профиля")
