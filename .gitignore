@@ -1,5 +1,7 @@
 # --- Секреты и локальное окружение (никогда не попадают в git) ---
 .env
+.env.*
+!.env.example
 
 # --- Go: артефакты сборки и кэш ---
 bin/
@@ -7,11 +9,14 @@ bin/
 *.test
 *.out
 
+# --- Frontend (Next.js) ---
+web/node_modules/
+web/.next/
+web/out/
+web/dist/
+
 # --- Docker volumes рядом с compose (если появятся) ---
 
 # --- Документация/IDE/прочее ---
 .idea/
 .vscode/
-# Зависимости
-web/node_modules/
-web/dist/

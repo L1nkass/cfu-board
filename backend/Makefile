@@ -16,11 +16,11 @@ help:
 build:
 	@echo "==> Сборка $(BINARY_NAME)..."
 	@mkdir -p bin
-	@CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/$(BINARY_NAME) ./cmd/app
+	@CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/$(BINARY_NAME) ./cmd/server
 
 ## run: запустить локально (нужен .env и поднятая БД)
 run:
-	@go run ./cmd/app
+	@go run ./cmd/server
 
 ## test: прогнать тесты
 test:

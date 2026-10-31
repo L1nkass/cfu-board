@@ -22,7 +22,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w -X main.version=$(date +%Y%m%d%H%M%S)" \
-    -o /out/cfu-board ./cmd/app
+    -o /out/cfu-board ./cmd/server
 
 # ---------- Этап 2: раннер ----------
 FROM alpine:3.21 AS runner
@@ -39,7 +39,7 @@ WORKDIR /app
 COPY --from=builder /out/cfu-board /app/cfu-board
 
 # Миграции и спецификация API для интерактивной документации на /docs.
-COPY --from=builder /app/pkg/migrations /app/pkg/migrations
+COPY --from=builder /app/migrations /app/migrations
 COPY --from=builder /app/docs /app/docs
 RUN chown -R app:app /app
 
